@@ -61,15 +61,20 @@ $env:PATH += ";$env:LOCALAPPDATA\agy\bin"
 
 ## Does this satisfy a "two local agents" requirement?
 
-It should - `agy` is Google's own published successor for the terminal, and it
-does the same job the requirement is after. But the wording in a syllabus may
-predate the migration, so **tell your instructor which pairing you used and
-why**, and keep the error message above as your evidence. Do not quietly
-substitute and hope nobody asks.
+Yes. `agy` is Google's own published successor for the terminal and does the job
+the requirement is after.
 
-The cleanest pairing on Windows today is **Claude Code + Codex**: both install
-and authenticate without any of this. Antigravity is the third option, not a
-required one.
+**MBA 693R (BYU, Fall 2026): confirmed with the instructor on 2026-09-14 that
+Antigravity is the intended Google route for this course.** So for this class you
+do not need to justify the substitution - just use it.
+
+In any other course, the syllabus wording may predate Google's migration. There,
+**tell your instructor which pairing you used and why**, and keep the error
+message above as your evidence. Do not quietly substitute and hope nobody asks.
+
+Either way, the lowest-friction pairing on Windows is **Claude Code + Codex** -
+both install and authenticate with none of this. Antigravity is the Google
+option, not a required third install.
 
 ## Known quirks of `agy`
 
