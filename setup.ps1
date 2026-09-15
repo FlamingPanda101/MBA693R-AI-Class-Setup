@@ -1,17 +1,23 @@
 <#
 setup.ps1 - bootstrap a folder-per-class Canvas workspace.
 
-  .\setup.ps1 -Interview                     ask the questions, then do it
-  .\setup.ps1 -Root C:\School                non-interactive, all three agents
-  .\setup.ps1 -Root C:\School -Agents claude only Claude Code shims
-  .\setup.ps1 -Root D:\Sync\School -Reuse    adopt a workspace synced from another PC
-  .\setup.ps1 -Root C:\School -Every 4       refresh every 4 hours (default 1)
-  .\setup.ps1 -Root C:\School -NoSchedule    skip the Windows scheduled task
+Runs on Windows (Windows PowerShell 5.1) and macOS (PowerShell 7, pwsh).
+Launch it with `powershell -ExecutionPolicy Bypass -File ./setup.ps1` on
+Windows, or `pwsh -File ./setup.ps1` on macOS - -ExecutionPolicy does not
+exist there and pwsh errors on it. Write paths with /, which both accept.
+
+  ./setup.ps1 -Interview                     ask the questions, then do it
+  ./setup.ps1 -Root <path>                   non-interactive, all three agents
+  ./setup.ps1 -Root <path> -Agents claude    only Claude Code shims
+  ./setup.ps1 -Root <synced path> -Reuse     adopt a workspace from another computer
+  ./setup.ps1 -Root <path> -Every 4          refresh every 4 hours (default 1)
+  ./setup.ps1 -Root <path> -NoSchedule       skip the recurring background job
 
 Discovers your courses from Canvas, writes courses.json, creates one folder per
 course with agent rules, takes a first snapshot, and schedules a read-only
-watcher. Safe to rerun: new courses merge in, and your STATUS.md, hand-written
-rules, and edited templates are never overwritten.
+watcher - Task Scheduler on Windows, a launchd agent on macOS. Safe to rerun:
+new courses merge in, and your STATUS.md, hand-written rules, and edited
+templates are never overwritten.
 #>
 param(
   [string]$Root,
@@ -45,24 +51,19 @@ if ($Agents) {
   if ($bad) { Write-Error "Unknown agent(s): $($bad -join ', '). Valid values are: $($VALID_AGENTS -join ', ')." }
 }
 
-# setx writes HKCU\Environment, which a process that was already running never
-# sees - including the AI agent that is driving this script. Without this, an
-# agent-run setup loops forever on "CANVAS_TOKEN is not set" even though the
-# student set it correctly. Read the User scope directly; the value is never
-# displayed, and `&`-invoked child scripts inherit it from $env:.
-if (-not $env:CANVAS_TOKEN) { $env:CANVAS_TOKEN = [Environment]::GetEnvironmentVariable('CANVAS_TOKEN', 'User') }
-if (-not $env:CANVAS_BASE)  { $env:CANVAS_BASE  = [Environment]::GetEnvironmentVariable('CANVAS_BASE',  'User') }
+# Everything that differs between Windows and macOS lives in platform.ps1.
+. (Join-Path $PSScriptRoot 'platform.ps1')
 
-function Find-GoogleDrive {
-  foreach ($d in (Get-PSDrive -PSProvider FileSystem -EA SilentlyContinue)) {
-    $p = Join-Path $d.Root 'My Drive'
-    if (Test-Path $p) { return $p }
-  }
-  foreach ($p in (Join-Path $env:USERPROFILE 'Google Drive'), (Join-Path $env:USERPROFILE 'My Drive')) {
-    if (Test-Path $p) { return $p }
-  }
-  return $null
-}
+# On Windows a token set by a previous run lives in HKCU\Environment, which a
+# process that was already running never sees - including the AI agent driving
+# this script. Without this, an agent-run setup loops forever on "CANVAS_TOKEN
+# is not set" even though the student set it correctly. On macOS the same call
+# reads the login Keychain. The value is never displayed, and `&`-invoked child
+# scripts inherit it from $env:.
+if (-not $env:CANVAS_TOKEN) { $env:CANVAS_TOKEN = Get-CanvasToken }
+if (-not $env:CANVAS_BASE)  { $env:CANVAS_BASE  = Get-CanvasBase }
+
+function Find-GoogleDrive { Find-CanvasCloudDrive }
 # Read-Host returns $null at end-of-input when there is no console - which is
 # what happens if an AI agent or a scheduled task runs -Interview. Calling
 # .Trim() on that throws "You cannot call a method on a null-valued expression",
@@ -95,30 +96,22 @@ function AskYesNo($question, $defaultYes) {
 # student's answers and reads as a bait-and-switch. Check first.
 if (-not $env:CANVAS_TOKEN) {
   $hintBase = if ($env:CANVAS_BASE) { $env:CANVAS_BASE.TrimEnd('/') } else { 'https://yourschool.instructure.com' }
+  $steps = Get-CanvasTokenInstructions $hintBase
+  $tail = Get-CanvasShellNote
+  if (-not (Test-CanvasTokenStorable)) {
+    Write-Warning "The 'security' command is missing, so the Keychain is unavailable. This is not a normal macOS setup."
+  }
   Write-Host @"
 
 Before anything else: this needs a Canvas token, and only YOU can make one.
 It takes about a minute.
 
-  1. Open  $hintBase/profile/settings  and click  + New Access Token
-     Purpose: canvas-watcher.  Expires: end of semester is sensible.
-     Picture guide: docs\image-prompt-canvas-token.md
-  2. Copy the token. Then open >>> Windows PowerShell <<< - NOT Command
-     Prompt, and NOT the black "cmd" window - and run exactly this line:
-
-       [Environment]::SetEnvironmentVariable('CANVAS_TOKEN', (Get-Clipboard), 'User'); Set-Clipboard -Value 'cleared'
-
-     It takes the token straight from your clipboard and stores it for your
-     Windows account, then wipes the clipboard so a stray Ctrl+V cannot paste
-     it into a chat. Nothing is printed, and unlike `setx` the token is never
-     passed on a command line where process auditing would record it.
-     If you use Win+V clipboard history, also clear it:
-     Settings > System > Clipboard > Clear clipboard data.
+$steps
   3. Run this script again. No new terminal needed.
 
-In Command Prompt that line does NOT work and does NOT tell you so - it would
-store the words "(Get-Clipboard)" and report success. Use Windows PowerShell.
+Picture guide: docs/image-prompt-canvas-token.md
 
+$tail
 Never paste the token into a chat, a file, or a screenshot. It is unscoped:
 whoever has it has your entire Canvas account. Stuck? Ask your AI assistant.
 
@@ -138,13 +131,13 @@ if ($Interview) {
   if ($already) {
     Write-Host "   Then point me at the synced copy and I will adopt it, not rebuild it." -F DarkGray
     if ($drive) { Write-Host "   Google Drive is on this PC at: $drive" -F DarkGray }
-    $Root = Ask "   Path to your existing workspace" $(if ($drive) { Join-Path $drive 'School' } else { Join-Path $env:USERPROFILE 'School' })
+    $Root = Ask "   Path to your existing workspace" $(if ($drive) { Join-Path $drive 'School' } else { Join-Path (Get-CanvasHome) 'School' })
     $Reuse = $true
   } else {
     if ($drive) {
       Write-Host "2. Google Drive is installed here: $drive" -F DarkGray
       $useDrive = AskYesNo "   Keep the workspace in Google Drive so it follows you between computers?" $true
-      $default = if ($useDrive) { Join-Path $drive 'School' } else { Join-Path $env:USERPROFILE 'School' }
+      $default = if ($useDrive) { Join-Path $drive 'School' } else { Join-Path (Get-CanvasHome) 'School' }
     } else {
       Write-Host "2. Google Drive is not installed on this computer." -F DarkGray
       Write-Host "   I cannot install it for you. If you want your workspace to follow you" -F DarkGray
@@ -154,7 +147,7 @@ if ($Interview) {
         Write-Host "Nothing changed. Rerun this script after installing Drive." -F Yellow
         exit 0
       }
-      $default = Join-Path $env:USERPROFILE 'School'
+      $default = Join-Path (Get-CanvasHome) 'School'
     }
     $Root = Ask "3. Where should the workspace live?" $default
   }
@@ -183,11 +176,11 @@ if ($Interview) {
   }
 
   $schoolHost = Ask "5. Your Canvas address" $(if ($env:CANVAS_BASE) { $env:CANVAS_BASE } else { 'https://byu.instructure.com' })
-  $env:CANVAS_BASE = $schoolHost.TrimEnd('/')
   # Persist it. Process scope dies with this run, and the next run would fall
   # back to the BYU default and send a non-BYU student's full-account token to
-  # a school they have no relationship with.
-  [Environment]::SetEnvironmentVariable('CANVAS_BASE', $env:CANVAS_BASE, 'User')
+  # a school they have no relationship with. Set-CanvasBase writes the User env
+  # scope on Windows and ~/.config on macOS, where that scope does nothing.
+  Set-CanvasBase $schoolHost
 
   $Every = [int](Ask "6. Refresh how often, in hours?" '1')
 
@@ -208,7 +201,7 @@ if ($Interview) {
 }
 
 if (-not $Root) {
-  Write-Error "No workspace path. Run '.\setup.ps1 -Interview' to be asked, or pass -Root <path>."
+  Write-Error "No workspace path. Run './setup.ps1 -Interview' to be asked, or pass -Root <path>."
 }
 
 # Fall back to the base this workspace already recorded before assuming BYU -
@@ -236,20 +229,21 @@ $Api  = "$Base/api/v1"
 # Resolve WITHOUT creating, so a refused path is not left behind as an empty folder.
 $rootFull = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Root)
 if ((Test-Path (Join-Path $PSScriptRoot 'SKILL.md')) -and ($rootFull -eq (Resolve-Path $PSScriptRoot).Path)) {
-  Write-Error "Pass -Root <workspace path>, e.g. .\setup.ps1 -Root C:\Users\you\School. The tool folder cannot also be the workspace: its CLAUDE.md/AGENTS.md/GEMINI.md would load in every class session."
+  Write-Error "Pass -Root <workspace path>, e.g. ./setup.ps1 -Root <your workspace path>. The tool folder cannot also be the workspace: its CLAUDE.md/AGENTS.md/GEMINI.md would load in every class session."
 }
 
 # ---------- prove the token works ----------
-$H = @{ Authorization = "Bearer $env:CANVAS_TOKEN" }
-try   { $me = Invoke-RestMethod "$Api/users/self" -Headers $H }
+try   { $me = Invoke-CanvasApi "$Api/users/self" }
 catch {
+  $fixBase   = Get-CanvasBaseFixInstructions
+  $shellNote = Get-CanvasShellNote
   Write-Error (
     "Canvas at $Base rejected the token. Two usual causes, most likely first:`n" +
-    "  1. Wrong school. If $Base is not yours, set the right one in Windows PowerShell:`n" +
-    "       [Environment]::SetEnvironmentVariable('CANVAS_BASE','https://yourschool.instructure.com','User')`n" +
+    "  1. Wrong school. If $Base is not yours, set the right one:`n" +
+    "$fixBase`n" +
     "  2. Expired or deleted token. Make a new one at $Base/profile/settings, copy it, then:`n" +
-    "       [Environment]::SetEnvironmentVariable('CANVAS_TOKEN', (Get-Clipboard), 'User'); Set-Clipboard -Value 'cleared'`n" +
-    "Use Windows PowerShell, not Command Prompt - Get-Clipboard does not exist there and fails silently.`n" +
+    (Get-CanvasTokenInstructions $Base) + "`n" +
+    "$shellNote`n" +
     "Underlying error: $($_.Exception.Message)")
 }
 Write-Host "Canvas says hello, $($me.name)." -F Green
@@ -259,16 +253,16 @@ New-Item -ItemType Directory -Force -Path $Root | Out-Null
 $Root = (Resolve-Path $Root).Path
 if ($Root -ne $PSScriptRoot) {
   # Scripts are overwritten - that is how you take an update.
-  foreach ($f in 'setup.ps1', 'canvas-watch.ps1', 'scaffold-class.ps1', 'standup.ps1', 'doctor.ps1') { Copy-Item (Join-Path $PSScriptRoot $f) $Root -Force }
+  foreach ($f in 'setup.ps1', 'canvas-watch.ps1', 'scaffold-class.ps1', 'standup.ps1', 'doctor.ps1', 'platform.ps1') { Copy-Item (Join-Path $PSScriptRoot $f) $Root -Force }
   New-Item -ItemType Directory -Force -Path (Join-Path $Root 'docs') | Out-Null
-  Copy-Item (Join-Path $PSScriptRoot 'docs\*') (Join-Path $Root 'docs') -Force
+  Copy-Item (Join-Path (Join-Path $PSScriptRoot 'docs') '*') (Join-Path $Root 'docs') -Force
   # Templates are NOT: shared-rules.md is yours to edit, and the docs say so.
   # Copying it back every rerun would silently revert your rules into every class.
-  if (-not (Test-Path (Join-Path $Root 'templates\shared-rules.md'))) {
+  if (-not (Test-Path (Join-Path $Root (Join-Path 'templates' 'shared-rules.md')))) {
     Copy-Item (Join-Path $PSScriptRoot 'templates') $Root -Recurse -Force
     Write-Host "Installed tool files and templates into $Root"
   } else {
-    Write-Host "Updated scripts in $Root (kept your templates\shared-rules.md)"
+    Write-Host "Updated scripts in $Root (kept your templates/shared-rules.md)"
   }
 }
 
@@ -298,7 +292,7 @@ elseif (-not @($cfg.agents))    { $cfg.agents = @('claude', 'codex', 'antigravit
 else                            { $cfg.agents = @($cfg.agents) }
 
 $known = @{}; foreach ($c in $cfg.courses) { $known[[string]$c.id] = $true }
-$live  = Invoke-RestMethod "$Api/courses?enrollment_state=active&per_page=100&include[]=term" -Headers $H
+$live  = Invoke-CanvasApi "$Api/courses?enrollment_state=active&per_page=100&include[]=term"
 $added = 0
 foreach ($c in @($live)) {
   if ($known.ContainsKey([string]$c.id)) { continue }
@@ -352,30 +346,31 @@ if ($addIgnore) {
 & (Join-Path $Root 'canvas-watch.ps1')
 
 # ---------- schedule ----------
+# Task Scheduler on Windows, a launchd agent on macOS. Register-CanvasSchedule
+# picks; it returns rather than throws when a platform cannot schedule, because
+# a workspace that built fine should not report as a failed install just because
+# the recurring job could not be registered.
 if (-not $NoSchedule) {
-  $taskName = "Canvas Watch - $(Split-Path $Root -Leaf)"
-  $action   = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$Root\canvas-watch.ps1`""
-  $trigger  = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(5) -RepetitionInterval (New-TimeSpan -Hours $Every) -RepetitionDuration (New-TimeSpan -Days 3650)
-  $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 15)
-  Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Description 'Read-only Canvas mirror. Never submits, grades, or messages.' -Force | Out-Null
-  Write-Host "Scheduled '$taskName' every $Every h. Check: Get-ScheduledTaskInfo -TaskName '$taskName'"
+  $r = Register-CanvasSchedule -Name "Canvas Watch - $(Split-Path $Root -Leaf)" `
+         -ScriptPath (Join-Path $Root 'canvas-watch.ps1') -EveryHours $Every
+  if ($r.Ok) { Write-Host "$($r.Detail) Refreshing every $Every h." }
+  else       { Write-Warning "Could not schedule the watcher: $($r.Detail). Run canvas-watch.ps1 yourself when you want an update." }
 }
 # ---------- standup ----------
 & (Join-Path $Root 'standup.ps1') -Quiet
 if (-not $NoSchedule -and $StandupAt) {
-  $sName    = "Canvas Standup - $(Split-Path $Root -Leaf)"
-  $sAction  = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$Root\standup.ps1`" -Refresh -Quiet"
-  # 'H:mm' (repeat count 1) accepts BOTH 7:30 and 07:30; 'HH:mm' demands two
-  # digits and would throw on the single-digit hour the guard above accepts.
-  # InvariantCulture because ':' in a format string means "the culture's time
-  # separator", which is not ':' everywhere.
-  $sTrigger = New-ScheduledTaskTrigger -Daily -At ([datetime]::ParseExact($StandupAt, 'H:mm', [Globalization.CultureInfo]::InvariantCulture))
-  $sSet     = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 15)
-  Register-ScheduledTask -TaskName $sName -Action $sAction -Trigger $sTrigger -Settings $sSet -Description 'Refreshes the Canvas mirror and rewrites STANDUP.md. Read-only.' -Force | Out-Null
-  Write-Host "Scheduled '$sName' daily at $StandupAt."
+  $s = Register-CanvasSchedule -Name "Canvas Standup - $(Split-Path $Root -Leaf)" `
+         -ScriptPath (Join-Path $Root 'standup.ps1') -ExtraArgs @('-Refresh', '-Quiet') `
+         -DailyAt $StandupAt -EveryHours 24 `
+         -Description 'Refreshes the Canvas mirror and rewrites STANDUP.md. Read-only.'
+  if ($s.Ok) { Write-Host "$($s.Detail) Daily at $StandupAt." }
+  else       { Write-Warning "Could not schedule the standup: $($s.Detail). Run standup.ps1 yourself any time." }
 }
 
+$dueHint     = Join-Path $Root 'DUE.md'
+$standupHint = Join-Path $Root 'STANDUP.md'
+$icsHint     = Join-Path $Root 'canvas-deadlines.ics'
 Write-Host ""
-Write-Host "Done. Open $Root\DUE.md for everything, or $Root\STANDUP.md for today." -F Green
-Write-Host "Calendar file: $Root\canvas-deadlines.ics - import it into Google, Outlook or Apple Calendar." -F DarkGray
+Write-Host "Done. Open $dueHint for everything, or $standupHint for today." -F Green
+Write-Host "Calendar file: $icsHint - import it into Google, Outlook or Apple Calendar." -F DarkGray
 Write-Host "Anything unclear? Ask your AI assistant - it has the full instructions in SKILL.md." -F DarkGray

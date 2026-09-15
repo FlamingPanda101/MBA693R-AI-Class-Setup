@@ -52,7 +52,7 @@ scheduled task on this machine. If no, continue.
 
 **2. "Do you have Google Drive installed on this computer?"**
 Check for them rather than making them look - a folder named `My Drive` on any
-drive letter, or `%USERPROFILE%\Google Drive`. Then:
+drive letter, or `~/Google Drive` (macOS: `~/Library/CloudStorage/GoogleDrive-<account>/My Drive`). Then:
 - **Found it:** offer to put the workspace inside Drive so it follows them
   between computers. Recommend yes. That is what makes question 1 work later.
 - **Not found:** say so plainly. You cannot install Drive for them. Offer the
@@ -61,8 +61,8 @@ drive letter, or `%USERPROFILE%\Google Drive`. Then:
   moved into Drive later. Neither answer is wrong. Do not stall on this.
 
 **3. "Where should the workspace live?"**
-Propose a concrete default: `<Drive>\My Drive\School` if they took Drive,
-otherwise `%USERPROFILE%\School`. It must be a **different folder from this tool
+Propose a concrete default: `<Drive>/My Drive/School` if they took Drive,
+otherwise `<home>/School` - call `Get-CanvasHome` rather than assuming. It must be a **different folder from this tool
 folder** - if the tool folder were the workspace, this folder's `CLAUDE.md` /
 `AGENTS.md` / `GEMINI.md` would sit above every class folder and each class
 session would load the installer instructions instead of that class's rules.
@@ -88,7 +88,7 @@ records their choice, and re-answering would delete the other agents' files.
 **5. "Which school's Canvas?"**
 Default `https://byu.instructure.com`. For any other school it is
 `https://<school>.instructure.com` - the address they already log into. Set it
-with `[Environment]::SetEnvironmentVariable('CANVAS_BASE','https://<school>.instructure.com','User')`.
+with `. ./platform.ps1; Set-CanvasBase 'https://<school>.instructure.com'`.
 It must start with `https://`: the scripts refuse anything else, because the
 Authorization header carries a full-account token and plain http would put it
 on the wire in cleartext.
@@ -101,7 +101,7 @@ it as `-Every <hours>`.
 **7. "Want a standup waiting for you each morning?"**
 A daily task that refreshes Canvas and rewrites `STANDUP.md`: what is due today,
 what is coming, what is past due. Pass `-StandupAt 07:30` (24-hour `HH:mm`).
-Skip it and they can still run `.\standup.ps1` any time they want one.
+Skip it and they can still run `./standup.ps1` any time they want one.
 
 **8. "Do you want your Slack, email and calendar connected too?"**
 Two separate answers, and they are not the same size:
@@ -110,7 +110,7 @@ Two separate answers, and they are not the same size:
   and their Canvas deadlines appear alongside everything else. Offer this to
   everyone; it costs nothing and needs no permissions.
 - **Live connections** - reading mail/Slack/calendar needs an OAuth sign-in per
-  service via MCP. Walk them through `docs\connect-slack-email-calendar.md`,
+  service via MCP. Walk them through `docs/connect-slack-email-calendar.md`,
   which has the exact command for each of the three assistants. Do not do this
   as a throwaway step at the end of an install; it deserves its own sitting.
 
@@ -121,47 +121,79 @@ first. If they seem unsure, recommend read-only scopes and offer to revisit it.
 
 Remind them again here that they can stop and ask you anything.
 
+## Which platform you are on
+
+**Establish this before running any command below.** Windows and macOS are both
+supported and the commands differ. Run:
+
+    . ./platform.ps1; Get-CanvasPlatform
+
+`platform.ps1` is the only file that knows the difference; everything else calls
+into it. Where this document writes `<pwsh>`, use `powershell -ExecutionPolicy
+Bypass` on Windows and `pwsh` on macOS - `-ExecutionPolicy` does not exist on
+macOS and pwsh errors on it. Write every path with `/`, which both platforms
+accept: a literal `\` is a legal filename character on macOS, not a separator,
+so a path built with one silently resolves to nothing instead of failing loudly.
+
+Linux gets the mirror, the standup and the folders, but no scheduling.
+`Register-CanvasSchedule` reports that rather than pretending; offer cron.
+
 ## The token - the one step only they can do
 
 Check whether it is already set, without touching its value:
 
-    if ([Environment]::GetEnvironmentVariable('CANVAS_TOKEN','User')) { 'set' } else { 'missing' }
+    . ./platform.ps1; if (Get-CanvasToken) { 'set' } else { 'missing' }
 
-Check the **User scope**, not `$env:CANVAS_TOKEN`. `setx` writes the registry, and
-a process that was already running - including you - cannot see it. `$env:` will
-report "missing" long after they have set it correctly.
+Use `Get-CanvasToken`, never `$env:CANVAS_TOKEN` directly. The stored value lives
+in the Windows User scope or the macOS login Keychain, and a process that was
+already running - including you - cannot see a value set after it started, so
+`$env:` reports "missing" long after they have set it correctly.
 
 If missing, have THEM do this in their own terminal. Walk them through it one
-line at a time, and offer the picture guide in `docs\image-prompt-canvas-token.md`:
+line at a time, and offer the picture guide in `docs/image-prompt-canvas-token.md`.
+To print the exact wording for their platform:
+`. ./platform.ps1; Get-CanvasTokenInstructions 'https://<their school>.instructure.com'`
 
 1. Open `<their canvas>/profile/settings` and click **+ New Access Token**.
    Purpose `canvas-watcher`. Expiry: end of the semester.
-2. Copy the token. Tell them explicitly to open **Windows PowerShell** - not
-   Command Prompt - then run exactly:
+2. Copy the token, then:
+
+   **Windows** - explicitly Windows PowerShell, not Command Prompt:
 
        [Environment]::SetEnvironmentVariable('CANVAS_TOKEN', (Get-Clipboard), 'User'); Set-Clipboard -Value 'cleared'
 
-   It takes the token straight from the clipboard, so it never appears on screen
-   or in shell history, then wipes the clipboard so a stray Ctrl+V cannot paste
-   it into a chat window.
-   - **Not `setx`**: setx takes the token as a command-line argument, and
-     process auditing and corporate EDR record full command lines. The form
-     above sets the same User-scope value in-process, with no child process.
+   **macOS** - in Terminal. The bare `-w` with no value after it is the point:
+
+       security add-generic-password -a "$USER" -s canvas-workspace-token -U -w
+
+   It prompts for the token and reads it silently; they paste and press Return.
+   Then `pbcopy < /dev/null` to clear the clipboard.
+
+   Both forms keep the token off the command line and out of shell history.
+   - **Not `setx`, and not `-w "<token>"`**: both put the secret on a command
+     line, where process auditing, corporate EDR and `ps` all record it.
    - **Not Command Prompt**: `Get-Clipboard` does not exist there and fails
      *silently* - cmd would store the literal text `(Get-Clipboard)` and print
      `SUCCESS`, leaving them convinced they were done.
-3. If they use Win+V clipboard history: Settings > System > Clipboard > Clear.
+3. Windows, if they use Win+V clipboard history: Settings > System > Clipboard >
+   Clear. macOS will ask permission the first time a script reads the Keychain -
+   tell them to choose **Always Allow**, or they get a prompt every hour.
 
 Wait for them to confirm. Then tell them what the token is: unscoped access to
 their whole Canvas account, which is exactly why you never handle it and why it
 is worth deleting at the end of the semester.
 
+**If they regenerate the token later**, any process that was already running
+keeps the dead one and Canvas answers 401. The scripts detect that and adopt the
+new value, warning "the Canvas token changed since this process started". Seeing
+that warning means it healed itself - nothing is wrong.
+
 ## Run it
 
-From the directory containing this file. The scripts read the User scope
+From the directory containing this file. The scripts read the stored token
 themselves, so no terminal restart and no agent restart is needed:
 
-    powershell -ExecutionPolicy Bypass -File ".\setup.ps1" -Root "<path>" -Agents claude,codex -Every 4
+    <pwsh> -File "./setup.ps1" -Root "<path>" -Agents claude,codex -Every 4
 
 Add `-Reuse` when they answered yes to question 1. Add `-NoSchedule` if they do
 not want the background task.
@@ -170,7 +202,7 @@ Setup greets them by name (which proves the token works), writes `courses.json`,
 creates a folder per course, `git init`s each one (Codex refuses non-repos),
 takes the first Canvas snapshot, and registers the scheduled task.
 
-A student with no AI assistant can run `.\setup.ps1 -Interview` and be asked
+A student with no AI assistant can run `./setup.ps1 -Interview` and be asked
 questions 1-7 by the script itself. Question 8 (connecting Slack, email and
 calendar) is yours to walk them through - the script does not attempt it.
 
@@ -179,7 +211,7 @@ calendar) is yours to walk them through - the script does not attempt it.
 Any time they ask whether their setup is right - or before a setup deadline -
 run:
 
-    powershell -ExecutionPolicy Bypass -File <workspace>\doctor.ps1
+    <pwsh> -File <workspace>/doctor.ps1
 
 It reports which agents are installed, whether they actually authenticate (a
 version number proves installation, never sign-in), whether CLAUDE.md and
@@ -191,12 +223,12 @@ of their account allowance.
 It also prints what it does NOT check. Read that part out loud rather than
 letting a green report stand in for a finished setup assignment: the book, the
 benchmark and surveys, installing and signing into the CLIs, mobile access,
-saving the conversation into `submissions\`, and running the bounded review
+saving the conversation into `submissions/`, and running the bounded review
 are all still theirs to do.
 
 **If Gemini CLI will not sign in**, it is not their mistake. Google returns
 `IneligibleTierError / UNSUPPORTED_CLIENT` for individual accounts and points
-at its Antigravity suite; `docs\gemini-vs-antigravity.md` has the exact error,
+at its Antigravity suite; `docs/gemini-vs-antigravity.md` has the exact error,
 the replacement CLI, and why Spark, Antigravity and Gemini CLI are three
 different things. Tell them to report the substitution to their instructor
 rather than quietly swapping tools.
@@ -204,7 +236,7 @@ rather than quietly swapping tools.
 
 Any time they ask - "what's due", "run my standup", "catch me up" - run:
 
-    powershell -ExecutionPolicy Bypass -File <workspace>\standup.ps1
+    <pwsh> -File <workspace>/standup.ps1
 
 Add `-Refresh` to pull Canvas first (needs the token), `-Days 14` to widen the
 window. It reads the local mirror, so without `-Refresh` it is instant and works
@@ -272,8 +304,8 @@ otherwise misread:
 - 0-point rows are usually readings or attendance markers, not real deliverables.
 
 Then point at one class folder and show the shape: `AGENTS.md` is the rules,
-`STATUS.md` is where they track that class, `canvas\` is the generated mirror
-they should never hand-edit, and `work\` and `submissions\` are theirs.
+`STATUS.md` is where they track that class, `canvas/` is the generated mirror
+they should never hand-edit, and `work/` and `submissions/` are theirs.
 
 Close by telling them they can come back to you any time - to add a class, change
 the rules, change how often it checks, or work on an actual assignment.
@@ -283,40 +315,40 @@ the rules, change how often it checks, or work on an actual assignment.
 Every path is in the **workspace**, not this tool folder - the workspace copies
 are what actually run. Every rerun needs `-ExecutionPolicy Bypass`:
 
-- Skip a course: `"enabled": false` in `<workspace>\courses.json`, then
-  `powershell -ExecutionPolicy Bypass -File <workspace>\setup.ps1 -Root <workspace>`
+- Skip a course: `"enabled": false` in `<workspace>/courses.json`, then
+  `<pwsh> -File <workspace>/setup.ps1 -Root <workspace>`
 - Add or drop an agent: same command plus `-Agents claude,antigravity`
 - New semester: same command; new courses merge in, edits are kept
-- Change a shared rule: edit `<workspace>\templates\shared-rules.md`, then
-  `powershell -ExecutionPolicy Bypass -File <workspace>\scaffold-class.ps1`
+- Change a shared rule: edit `<workspace>/templates/shared-rules.md`, then
+  `<pwsh> -File <workspace>/scaffold-class.ps1`
 - Token expiry warning: `"tokenExpires": "2026-12-13"` in `courses.json`
-- Health check: `Get-ScheduledTaskInfo -TaskName 'Canvas Watch - <folder>'`
+- Health check: `. ./platform.ps1; Get-CanvasScheduleState` - reads Task Scheduler on Windows, launchd on macOS
   (`LastTaskResult 0` is healthy)
 
 ## What it makes
 
 ```
-<workspace>\
+<workspace>/
   DUE.md                  everything outstanding, all classes, by date
   CHANGES.md              what changed since the last run
   courses.json            course -> folder map, agent choice, token expiry
-  templates\shared-rules.md
-  <Course A>\
+  templates/shared-rules.md
+  <Course A>/
     AGENTS.md             rules: shared block + this course's facts
     CLAUDE.md GEMINI.md   only for the agents they chose
     STATUS.md             their notes for this class
-    canvas\               generated mirror - never hand-edit
-    sources\ work\ submissions\
-  <Course B>\ ...
+    canvas/               generated mirror - never hand-edit
+    sources/ work/ submissions/
+  <Course B>/ ...
 ```
 
-## Windows PowerShell 5.1 traps the scripts already avoid
+## PowerShell traps the scripts already avoid
 
 Worth knowing if you edit them:
 - Variable names are case-insensitive: `$Due` and `$due` are the same variable.
 - `@(Some-Function ...)` nests a returned array as one element instead of enumerating it.
 - `h` is an alias for `Get-History`; do not name a function `H`.
 - A UTF-8 script without a BOM is read as ANSI: keep `.ps1` files ASCII.
-- `setx` writes the registry; a running process never sees it. Read the User scope.
+- `setx` writes the registry; a running process never sees it. Use `Get-CanvasToken`.
 - OneDrive and Google Drive hold file handles briefly after syncing; writes retry.
 - Canvas due dates are UTC; `05:59:59Z` is 11:59 PM the previous day in Mountain Time.

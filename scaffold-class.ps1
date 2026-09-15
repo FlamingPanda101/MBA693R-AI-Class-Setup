@@ -1,5 +1,5 @@
 # scaffold-class.ps1 - give every enabled class in courses.json the same agent setup.
-# Creates sources\ work\ submissions\, AGENTS.md, CLAUDE.md, GEMINI.md, STATUS.md.
+# Creates sources/ work/ submissions/ skills/, AGENTS.md, CLAUDE.md, GEMINI.md, STATUS.md.
 # Never overwrites STATUS.md or hand-written text in AGENTS.md: it refreshes only
 # the block between the SHARED RULES markers. Rerun any time.
 $ErrorActionPreference = 'Stop'
@@ -12,7 +12,7 @@ function WriteUtf8($path, $text) {
 }
 
 $cfg  = Get-Content (Join-Path $Root 'courses.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-$tpl  = Get-Content (Join-Path $Root 'templates\shared-rules.md') -Raw -Encoding UTF8
+$tpl  = Get-Content (Join-Path $Root (Join-Path 'templates' 'shared-rules.md')) -Raw -Encoding UTF8
 $shared = $tpl -replace '\{\{OWNER\}\}', [string]$cfg.owner
 
 # Only write shims for the agents the student actually uses. AGENTS.md is always
@@ -27,7 +27,7 @@ if ($agents -contains 'antigravity') { $shims['GEMINI.md'] = $true }
 # a parent of the folder it was launched in, so a parent import silently loads
 # nothing. Tested 2026-09-14. Copies between markers are refreshable and work
 # for Claude Code, Codex and Antigravity alike.
-$BEGIN = '<!-- BEGIN SHARED RULES - generated from templates\shared-rules.md by scaffold-class.ps1. Edit the template, not this block. -->'
+$BEGIN = '<!-- BEGIN SHARED RULES - generated from templates/shared-rules.md by scaffold-class.ps1. Edit the template, not this block. -->'
 $END   = '<!-- END SHARED RULES -->'
 $sharedBlock = "$BEGIN`n`n$shared`n$END"
 $stamp = Get-Date -Format 'yyyy-MM-dd'

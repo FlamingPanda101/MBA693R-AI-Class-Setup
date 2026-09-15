@@ -38,13 +38,13 @@ never sign-in**, which is exactly why this trips people up.
 
 ## What to do instead
 
-Install Google's replacement CLI. In Windows PowerShell:
+Install Google's replacement CLI. In Windows PowerShell (on macOS see the note below):
 
 ```powershell
 irm https://antigravity.google/cli/install.ps1 | iex
 ```
 
-The binary lands at `%LOCALAPPDATA%\agy\bin\agy.exe`. It inherits credentials
+The binary lands at `%LOCALAPPDATA%\agy\bin\agy.exe` on Windows, or `~/.agy/bin/agy` on macOS. It inherits credentials
 from the Antigravity desktop app, so if you have signed in there you do not sign
 in again. Check it:
 

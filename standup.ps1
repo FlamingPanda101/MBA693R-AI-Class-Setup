@@ -44,7 +44,11 @@ $oldest = $null
 
 foreach ($c in @($cfg.courses)) {
   if ($c.enabled -eq $false) { continue }
-  $sub = if ($c.folder -and (Test-Path (Join-Path $Root (Join-Path $c.folder 'sources\canvas\assignments.json')))) { 'sources\canvas' } else { 'canvas' }
+  # Join-Path rather than a literal 'sources\canvas'. On macOS a backslash is a
+  # legal filename character, not a separator, so the literal form would not
+  # error - it would quietly match nothing and report every class as empty.
+  $srcSub = Join-Path 'sources' 'canvas'
+  $sub = if ($c.folder -and (Test-Path (Join-Path $Root (Join-Path $c.folder (Join-Path $srcSub 'assignments.json'))))) { $srcSub } else { 'canvas' }
   $f = Join-Path $Root (Join-Path $c.folder (Join-Path $sub 'assignments.json'))
   if (-not (Test-Path $f)) { continue }
   $stamp = (Get-Item $f).LastWriteTime

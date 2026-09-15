@@ -14,6 +14,7 @@ Exit code 0 only when every required check passes.
 param([switch]$Fast)
 $ErrorActionPreference = 'Continue'
 $Root = $PSScriptRoot
+. (Join-Path $PSScriptRoot 'platform.ps1')
 $fail = 0; $warn = 0
 
 function Say($status, $text, $detail) {
@@ -47,8 +48,16 @@ foreach ($a in @(
   }
 }
 # Antigravity ships its own binary and is not always on PATH.
-$agyPath = Join-Path $env:LOCALAPPDATA 'agy\bin\agy.exe'
-$agy = if (HasCmd 'agy') { 'agy' } elseif (Test-Path $agyPath) { $agyPath } else { $null }
+$agyCandidates = if ((Get-CanvasPlatform) -eq 'windows') {
+  @((Join-Path $env:LOCALAPPDATA (Join-Path 'agy' (Join-Path 'bin' 'agy.exe'))))
+} else {
+  @((Join-Path (Get-CanvasHome) '.agy/bin/agy'),
+    (Join-Path (Get-CanvasHome) '.local/bin/agy'),
+    '/opt/homebrew/bin/agy',
+    '/usr/local/bin/agy')
+}
+$agyPath = @($agyCandidates | Where-Object { $_ -and (Test-Path $_) })[0]
+$agy = if (HasCmd 'agy') { 'agy' } elseif ($agyPath) { $agyPath } else { $null }
 if ($agy) {
   Say 'OK' "Antigravity CLI installed" "version $(& $agy --version 2>&1 | Select-Object -First 1)"
   $agents += 'Antigravity'
@@ -173,22 +182,12 @@ if (Test-Path (Join-Path $Root 'DUE.md')) {
   # repeatedly - not that it is merely due for its next refresh.
   if ($age -le 3) { Say 'OK' "DUE.md refreshed $age h ago" } else { Say 'WARN' "DUE.md is $age h old - about $age missed hourly runs" 'run canvas-watch.ps1, and check the scheduled task below' }
 } else { Say 'FAIL' 'DUE.md missing' 'run canvas-watch.ps1' }
-$task = Get-ScheduledTask | Where-Object { $_.TaskName -like '*Canvas*' } | Select-Object -First 1
-if ($task) {
-  $i = Get-ScheduledTaskInfo -TaskName $task.TaskName
-  $rc = [uint32]$i.LastTaskResult
-  # Task Scheduler reports these as huge unsigned decimals. The two you will
-  # actually meet are worth translating; anything else gets the hex to search.
-  $why = switch ($rc) {
-    0          { $null }
-    267009     { 'it is running right now - not a failure' }
-    267011     { 'it has not run yet' }
-    4294770688 { "the workspace drive was offline when it fired (Google Drive not running), so it could not reach $Root" }
-    default    { 'look up the hex code, or run canvas-watch.ps1 by hand to see the real error' }
-  }
-  if ($rc -eq 0) { Say 'OK' "scheduled task '$($task.TaskName)' healthy" "next run $($i.NextRunTime)" }
-  else { Say 'WARN' ("scheduled task last exited 0x{0:X8}" -f $rc) "$why  [$($task.TaskName), last ran $($i.LastRunTime)]" }
-} else { Say 'WARN' 'no Canvas scheduled task found' 'rerun setup.ps1 without -NoSchedule' }
+# Task Scheduler on Windows, launchd on macOS - Get-CanvasScheduleState knows
+# which, and translates each platform's opaque status codes into one answer.
+$sched = Get-CanvasScheduleState -Match 'Canvas'
+if (-not $sched.Found) { Say 'WARN' 'no recurring Canvas job found' "$($sched.Detail) - rerun setup.ps1 without -NoSchedule" }
+elseif ($sched.Healthy) { Say 'OK' "recurring job '$($sched.Name)' healthy" $sched.Detail }
+else { Say 'WARN' "recurring job '$($sched.Name)' is not healthy" $sched.Detail }
 Write-Host ""
 
 # ---------------- what this does NOT check ----------------

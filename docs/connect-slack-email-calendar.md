@@ -217,7 +217,8 @@ inherits them.
 And schedule the standup so it is waiting for you:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File <workspace>\setup.ps1 -Root <workspace> -StandupAt 07:30
+# Windows:  powershell -ExecutionPolicy Bypass -File <workspace>/setup.ps1 -Root <workspace> -StandupAt 07:30
+# macOS:    pwsh -File <workspace>/setup.ps1 -Root <workspace> -StandupAt 07:30
 ```
 
 That registers a daily task that refreshes Canvas and rewrites `STANDUP.md`.

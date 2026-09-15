@@ -37,13 +37,24 @@ layout only and add the captions yourself.
 > with a copy icon, and a red warning banner reading **"Shown only once - copy it
 > before you leave this page"**. Do not render any readable token characters.
 >
-> Step 5 - "Open Windows PowerShell and store it": a terminal window whose title
-> bar clearly reads **Windows PowerShell**, with a small inset showing the
-> Windows Start menu with "PowerShell" typed into the search box. The terminal
-> shows exactly one line of white monospace text:
+> Step 5 - "Store it in your terminal": a single panel split left and right by a
+> thin vertical rule, each half labelled with its platform name.
+>
+> Left half, headed **Windows**: a terminal whose title bar clearly reads
+> **Windows PowerShell**, with a small inset of the Start menu with "PowerShell"
+> typed into the search box. One line of white monospace text:
 > `[Environment]::SetEnvironmentVariable('CANVAS_TOKEN', (Get-Clipboard), 'User'); Set-Clipboard -Value 'cleared'`
-> with a caption beneath: "Windows PowerShell only - not Command Prompt. Takes
-> the token from your clipboard, then wipes the clipboard. Nothing is printed."
+> Caption: "Windows PowerShell only - not Command Prompt. Takes the token from
+> your clipboard, then wipes it. Nothing is printed."
+>
+> Right half, headed **macOS**: a macOS Terminal window. One line of white
+> monospace text:
+> `security add-generic-password -a "$USER" -s canvas-workspace-token -U -w`
+> with the cursor sitting on a following line that reads
+> `password data for new item:` and nothing typed after it.
+> Caption: "The bare -w at the end is deliberate - Terminal prompts for the
+> token instead of putting it on the command line. Paste, press Return, then
+> run pbcopy < /dev/null to clear the clipboard."
 >
 > At the bottom, a red-bordered callout box with a lock icon reading:
 > **"Never paste this token into a chat, a document, or a screenshot. It is full
@@ -70,12 +81,22 @@ Ask for the frame only, then add captions in any editor:
 - Purpose is a free-text label; `canvas-watcher` is a convention, not a requirement.
 - An expiry is optional in Canvas, but end-of-semester is the safe choice.
 - The token grants the student's **whole** Canvas account. It is not scoped to one course.
-- The terminal must be **Windows PowerShell**, not Command Prompt. This matters
-  more than it looks: `Get-Clipboard` does not exist in cmd, and the command
-  fails *silently* there - cmd would store the literal characters
+- On Windows the terminal must be **Windows PowerShell**, not Command Prompt.
+  This matters more than it looks: `Get-Clipboard` does not exist in cmd, and
+  the command fails *silently* there - cmd would store the literal characters
   `(Get-Clipboard)` and print `SUCCESS`, so the student walks away believing the
   token is saved when it is not, with their real token still on the clipboard.
 - Use `[Environment]::SetEnvironmentVariable(...)`, **not** `setx`. Both persist
   to the same place, but `setx` receives the token as a command-line argument,
   which Windows process auditing and corporate EDR agents record and forward.
+- On macOS the token goes to the **login Keychain**, not a file and not a shell
+  profile. The `-w` at the end of the `security` command must have **nothing
+  after it** - that is what makes it prompt. Writing `-w "<the token>"` would
+  put the secret on the command line, where `ps` and shell history both keep it,
+  which is the same mistake as `setx` on Windows.
+- The image must not imply the tool is Windows-only. Both halves are equally
+  supported; a Mac needs PowerShell 7 (`brew install --cask powershell`) to run
+  the scripts afterwards, but the token step above uses only built-in macOS.
+- Do not show the two halves as "recommended" and "alternative". They are the
+  same step on two platforms, and a student sees only their own.
 - Do not render any readable token characters anywhere in the image.

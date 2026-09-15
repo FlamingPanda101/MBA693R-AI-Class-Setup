@@ -7,7 +7,12 @@ single `DUE.md` of everything outstanding across all your classes.
 Read-only. It never submits, grades, or messages. Your Canvas token stays on
 your machine and is never written to a file.
 
-## Install (Windows, PowerShell 5.1 or later)
+## Install (Windows or macOS)
+
+- **Windows** - Windows PowerShell 5.1, already on your machine. Nothing to install.
+- **macOS** - PowerShell 7: `brew install --cask powershell`, then use `pwsh`.
+  The token goes in your login Keychain and the hourly refresh is a launchd
+  agent; you do not need Windows or a VM.
 
 You need **one** of Claude Code, Codex, or Antigravity - not all three.
 
@@ -26,6 +31,7 @@ It asks you seven questions, then does the rest:
 step, redo one, or change an answer later.
 
 **No AI assistant?** Get the files yourself first, then run the same interview.
+
 In **Windows PowerShell**:
 
 ```powershell
@@ -34,9 +40,18 @@ cd MBA693R-AI-Class-Setup
 powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Interview
 ```
 
+In **Terminal on macOS** - note `pwsh`, and no `-ExecutionPolicy`, which does not
+exist outside Windows and makes pwsh error:
+
+```bash
+git clone https://github.com/FlamingPanda101/MBA693R-AI-Class-Setup.git
+cd MBA693R-AI-Class-Setup
+pwsh -File ./setup.ps1 -Interview
+```
+
 No Git? On the GitHub page click the green **Code** button, then **Download
-ZIP**, right-click the downloaded file, **Extract All**, and open Windows
-PowerShell in the extracted folder before running the third line.
+ZIP** and unpack it - right-click and **Extract All** on Windows, double-click on
+macOS - then open a terminal in the extracted folder before the last line.
 
 This folder is only the installer. It asks where your workspace should live and
 builds it there - your coursework never lives in the cloned copy, so you can
@@ -193,9 +208,22 @@ which also explains why those three names are not interchangeable.
 
 ## Requirements
 
-Windows 10/11, Windows PowerShell 5.1+, a Canvas account.
+A Canvas account, and either:
 
-**Using Codex? You also need Git** (`winget install Git.Git`, or git-scm.com).
+- **Windows 10/11** with Windows PowerShell 5.1+ — already installed, nothing to add.
+- **macOS** with PowerShell 7: `brew install --cask powershell`, then use `pwsh`
+  wherever this README says `powershell`, and drop `-ExecutionPolicy Bypass`
+  (it does not exist outside Windows and pwsh errors on it).
+
+What differs between the two is confined to `platform.ps1`: the token goes in
+the Windows user environment or the macOS login Keychain, and the hourly refresh
+is a Task Scheduler task or a launchd agent. Everything else is the same file.
+
+Linux will mirror Canvas, build the folders and run standups, but nothing
+schedules the refresh — setup says so and suggests cron rather than pretending.
+
+**Using Codex? You also need Git** (`winget install Git.Git` on Windows, `brew
+install git` or the Xcode command line tools on macOS, or git-scm.com).
 Codex refuses any folder that is not a git repository. When git is present the
 tool runs `git init` in each class folder for you; when it is absent, setup
 warns you and the folders are created anyway, but Codex will not open them.

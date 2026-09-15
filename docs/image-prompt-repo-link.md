@@ -66,10 +66,12 @@ Ask for the frame only, then add captions in any editor:
 
 ## Facts the picture must not get wrong
 
-- **Windows only.** The tool is Windows PowerShell 5.1 plus Windows Task
-  Scheduler; there is no macOS or Linux path. The picture must say so up front,
-  because a Mac classmate who follows it will create a full-account Canvas token
-  before discovering nothing can use it. Making a token is the irreversible step.
+- **Windows and macOS both work.** Windows PowerShell 5.1 with Task Scheduler,
+  or PowerShell 7 (`pwsh`) with a launchd agent. The picture should name both,
+  and should say a Mac needs `brew install --cask powershell` first: a classmate
+  who assumes otherwise makes a full-account Canvas token before discovering a
+  missing prerequisite, and making the token is the one irreversible step here.
+  Linux mirrors Canvas and runs standups but schedules nothing.
 - The link is the **repository**, not a download of a single file.
 - Any **one** of the three agents is enough — *except* that Codex additionally
   requires Git to be installed. Without it the class folders are not

@@ -12,11 +12,14 @@ $Log     = Join-Path $Root 'CHANGES.md'
 $DuePath = Join-Path $Root 'DUE.md'   # not $Due: PowerShell vars are case-insensitive
 $Horizon = 14                          # days shown in full detail in DUE.md
 
-# setx writes HKCU\Environment, invisible to an already-running process (the AI
-# agent driving this, or a scheduled task started before the value was set).
-# Read the User scope directly. The value is never displayed.
-if (-not $env:CANVAS_TOKEN) { $env:CANVAS_TOKEN = [Environment]::GetEnvironmentVariable('CANVAS_TOKEN', 'User') }
-if (-not $env:CANVAS_BASE)  { $env:CANVAS_BASE  = [Environment]::GetEnvironmentVariable('CANVAS_BASE',  'User') }
+. (Join-Path $PSScriptRoot 'platform.ps1')
+# The stored token is invisible to an already-running process: on Windows it is
+# in HKCU\Environment, on macOS in the login Keychain. Read it directly. This
+# also matters for the scheduled job - a launchd agent inherits almost none of
+# your login shell's environment, so $env:CANVAS_TOKEN is empty there by design.
+# The value is never displayed.
+if (-not $env:CANVAS_TOKEN) { $env:CANVAS_TOKEN = Get-CanvasToken }
+if (-not $env:CANVAS_BASE)  { $env:CANVAS_BASE  = Get-CanvasBase }
 if (-not $env:CANVAS_TOKEN) { Write-Error 'CANVAS_TOKEN is not set. Run setup.ps1 for the three-step fix.' }
 if (-not (Test-Path $MapPath)) { Write-Error 'courses.json not found. Run setup.ps1 first.' }
 $cfg  = Get-Content $MapPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -30,11 +33,18 @@ $Api  = "$Base/api/v1"
 
 if ($cfg.tokenExpires) {
   $days = ([datetime]$cfg.tokenExpires - (Get-Date)).Days
-  if ($days -lt 0)      { Write-Warning ("CANVAS_TOKEN expired $($cfg.tokenExpires). Make a new one, copy it, then run this in Windows PowerShell (not Command Prompt): " +
-                                         "[Environment]::SetEnvironmentVariable('CANVAS_TOKEN', (Get-Clipboard), 'User'); Set-Clipboard -Value 'cleared'  -  then update tokenExpires in courses.json.") }
+  if ($days -lt 0)      { Write-Warning ("CANVAS_TOKEN expired $($cfg.tokenExpires). Make a new one, then:`n" +
+                                         (Get-CanvasTokenInstructions $Base) +
+                                         "`nThen update tokenExpires in courses.json.") }
   elseif ($days -le 14) { Write-Warning "CANVAS_TOKEN expires in $days day(s), on $($cfg.tokenExpires)." }
 }
 
+# One cheap call before the real work. If the token was regenerated after this
+# process started - a long-lived agent, or a scheduled job whose environment
+# was captured earlier - Invoke-CanvasApi picks up the new one and updates
+# $env:CANVAS_TOKEN. Without this the run would instead fail once per course
+# with an unexplained 401. $H is built AFTER it, so it carries the good token.
+$null = Invoke-CanvasApi "$Api/users/self"
 $H = @{ Authorization = "Bearer $env:CANVAS_TOKEN" }
 
 # Always returns a real array. Do NOT write @(SomeFunction ...) in this file:
