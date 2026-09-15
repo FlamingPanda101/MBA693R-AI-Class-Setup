@@ -7,17 +7,18 @@ single `DUE.md` of everything outstanding across all your classes.
 Read-only. It never submits, grades, or messages. Your Canvas token stays on
 your machine and is never written to a file.
 
-## Install (Windows or macOS)
+## Install
 
-- **Windows** - Windows PowerShell 5.1, already on your machine. Nothing to install.
-- **macOS** - PowerShell 7: `brew install --cask powershell`, then use `pwsh`.
-  The token goes in your login Keychain and the hourly refresh is a launchd
-  agent; you do not need Windows or a VM.
+You need **one** of Claude Code, Codex, or Antigravity. Open it and send it this,
+in your own words:
 
-You need **one** of Claude Code, Codex, or Antigravity - not all three.
+> https://github.com/FlamingPanda101/MBA693R-AI-Class-Setup
+>
+> Set this up for me and teach me how to use it.
 
-**With any of them** - paste the repo link and say "set up my Canvas workspace".
-It asks you seven questions, then does the rest:
+That is the whole thing. **You do not type any commands.** It works out whether
+you are on Windows or a Mac by itself, downloads the files, asks you seven short
+questions, builds everything, and then walks you through what you got.
 
 1. Have you already set this up on another computer?
 2. Do you have Google Drive on this machine, and should the workspace live there?
@@ -27,40 +28,81 @@ It asks you seven questions, then does the rest:
 6. How often should it check?
 7. Want a daily standup, and at what time?
 
-**Ask it anything as you go.** It has the full instructions and can explain any
-step, redo one, or change an answer later.
+Every question has a sensible default, and there is exactly one step it cannot do
+for you: making a Canvas token, because only you can log into your Canvas. It
+walks you through that too.
 
-**No AI assistant?** Get the files yourself first, then run the same interview.
+**Ask it anything as you go** - "what is a token?", "why does it want Google
+Drive?", "can you change that answer?". It has the full instructions and can
+explain any step, redo one, or change an answer later.
 
-In **Windows PowerShell**:
+**On a Mac** it will check for PowerShell 7 and, if it is missing, give you the
+one-line `brew install --cask powershell` and wait. Nothing is changed until then.
+You do not need Windows or a VM.
 
-```powershell
-git clone https://github.com/FlamingPanda101/MBA693R-AI-Class-Setup.git
-cd MBA693R-AI-Class-Setup
-powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Interview
-```
+<details>
+<summary>No AI assistant? Do it by hand instead</summary>
 
-In **Terminal on macOS** - note `pwsh`, and no `-ExecutionPolicy`, which does not
-exist outside Windows and makes pwsh error:
+Get the files, then run the launcher for your computer. You still do not need to
+know which shell you are on or which flags it wants - that is the launcher's job.
 
 ```bash
 git clone https://github.com/FlamingPanda101/MBA693R-AI-Class-Setup.git
 cd MBA693R-AI-Class-Setup
-pwsh -File ./setup.ps1 -Interview
 ```
+
+Then, **on Windows**, double-click `setup.cmd` in the folder - or from a
+terminal:
+
+```powershell
+setup.cmd
+```
+
+**On macOS**, in Terminal:
+
+```bash
+./setup.sh
+```
+
+Both ask the same seven questions and build the same workspace. `setup.sh` will
+tell you how to install PowerShell if it is missing, and changes nothing until
+it is. When setup finishes it prints the exact commands for *your* machine, so
+you never have to translate anything from this README.
 
 No Git? On the GitHub page click the green **Code** button, then **Download
 ZIP** and unpack it - right-click and **Extract All** on Windows, double-click on
-macOS - then open a terminal in the extracted folder before the last line.
+macOS - then use the launcher in the extracted folder.
 
 This folder is only the installer. It asks where your workspace should live and
 builds it there - your coursework never lives in the cloned copy, so you can
 delete it afterwards.
 
-**The standup**, whether or not you scheduled one:
+</details>
+
+## Using it afterwards
+
+You still do not type commands. Ask your assistant in plain language:
+
+> what's due this week?
+> run my standup
+> help me start the Fabritek case
+> add my new class
+
+It refreshes Canvas every hour on its own, so the answer is current without you
+asking for a refresh.
+
+If you would rather run it yourself, setup prints the exact commands for *your*
+machine when it finishes - no translating from this README. For reference, the
+standup is:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\standup.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\standup.ps1
+```
+
+and on macOS:
+
+```bash
+pwsh -NoProfile -File ./standup.ps1
 ```
 
 Prints what is due today, what is coming in the next 7 days, and what is past

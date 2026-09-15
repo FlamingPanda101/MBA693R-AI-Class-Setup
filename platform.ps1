@@ -74,6 +74,17 @@ function Get-CanvasShellExe {
   return 'pwsh'
 }
 
+function Get-CanvasRunCommand($scriptPath, $extra) {
+  # The exact command line to run one of these scripts ON THIS MACHINE, ready to
+  # paste. Printed rather than described so nobody has to translate a
+  # "<pwsh> -File ..." placeholder into whatever their platform wants.
+  $tail = if ($extra) { ' ' + (@($extra) -join ' ') } else { '' }
+  if ((Get-CanvasPlatform) -eq 'windows') {
+    return "powershell -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`"$tail"
+  }
+  return "pwsh -NoProfile -File `"$scriptPath`"$tail"
+}
+
 function Get-CanvasShellArgs($scriptPath) {
   # -ExecutionPolicy does not exist outside Windows and pwsh errors on it.
   if ((Get-CanvasPlatform) -eq 'windows') {

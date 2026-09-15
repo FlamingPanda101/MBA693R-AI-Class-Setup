@@ -4,12 +4,15 @@
 # belt-and-braces in case someone runs the tool in place anyway.
 *
 !.gitignore
+!.gitattributes
 !README.md
 !SKILL.md
 !AGENTS.md
 !CLAUDE.md
 !GEMINI.md
 !setup.ps1
+!setup.cmd
+!setup.sh
 !platform.ps1
 !canvas-watch.ps1
 !scaffold-class.ps1

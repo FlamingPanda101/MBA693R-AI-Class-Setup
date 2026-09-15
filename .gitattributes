@@ -1,0 +1,22 @@
+# Line endings, pinned per file type rather than left to each machine's
+# core.autocrlf setting.
+#
+# setup.sh MUST check out with LF. A shell script with CRLF endings fails on
+# macOS with "bad interpreter: /bin/sh^M" - the \r becomes part of the
+# interpreter path. It is one of the least obvious errors a new user can hit,
+# and it would happen to every Mac classmate cloning from a Windows-authored
+# repo without this line.
+*.sh text eol=lf
+
+# setup.cmd is the mirror case: cmd.exe wants CRLF, and a .cmd file with bare
+# LF endings can mis-parse multi-line blocks.
+*.cmd text eol=crlf
+
+# PowerShell reads either, but keep them consistent with the platform that
+# edits them most.
+*.ps1 text eol=crlf
+
+# Markdown and JSON are read by tools on both platforms; normalise to LF in the
+# repository and let git hand each checkout what it wants.
+*.md text
+*.json text

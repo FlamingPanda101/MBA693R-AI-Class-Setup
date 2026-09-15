@@ -373,4 +373,11 @@ $icsHint     = Join-Path $Root 'canvas-deadlines.ics'
 Write-Host ""
 Write-Host "Done. Open $dueHint for everything, or $standupHint for today." -F Green
 Write-Host "Calendar file: $icsHint - import it into Google, Outlook or Apple Calendar." -F DarkGray
+Write-Host ""
+# Print the commands for THIS machine, already correct. A reader should never
+# have to work out which shell they are on or which flags their platform wants.
+Write-Host "To run these yourself later, on this computer:" -F Cyan
+Write-Host "  standup     $(Get-CanvasRunCommand (Join-Path $Root 'standup.ps1'))" -F DarkGray
+Write-Host "  check setup $(Get-CanvasRunCommand (Join-Path $Root 'doctor.ps1'))" -F DarkGray
+Write-Host ""
 Write-Host "Anything unclear? Ask your AI assistant - it has the full instructions in SKILL.md." -F DarkGray
