@@ -84,7 +84,7 @@ mail and Slack are a separate, bigger decision, and that guide covers both.
 
 `-Root` must be a different folder from this repo. Setup greets you by name,
 discovers your courses, builds the folders, `git init`s each one, takes the
-first snapshot, and schedules a refresh every 4 hours.
+first snapshot, and schedules a refresh every hour.
 
 No new terminal needed: the scripts read the User-scope value directly, so they
 work immediately - including when an AI agent runs them for you.

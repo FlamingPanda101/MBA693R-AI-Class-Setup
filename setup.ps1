@@ -5,7 +5,7 @@ setup.ps1 - bootstrap a folder-per-class Canvas workspace.
   .\setup.ps1 -Root C:\School                non-interactive, all three agents
   .\setup.ps1 -Root C:\School -Agents claude only Claude Code shims
   .\setup.ps1 -Root D:\Sync\School -Reuse    adopt a workspace synced from another PC
-  .\setup.ps1 -Root C:\School -Every 6       refresh every 6 hours (default 4)
+  .\setup.ps1 -Root C:\School -Every 4       refresh every 4 hours (default 1)
   .\setup.ps1 -Root C:\School -NoSchedule    skip the Windows scheduled task
 
 Discovers your courses from Canvas, writes courses.json, creates one folder per
@@ -21,7 +21,7 @@ param(
   # string "claude,codex", which a ValidateSet on a string[] rejects outright.
   # Parse and validate it here instead so the documented command works.
   [string]$Agents,
-  [int]$Every = 4,
+  [int]$Every = 1,
   # 24-hour HH:mm. When set, a daily standup task is registered as well.
   [string]$StandupAt,
   [switch]$NoSchedule,
@@ -189,7 +189,7 @@ if ($Interview) {
   # a school they have no relationship with.
   [Environment]::SetEnvironmentVariable('CANVAS_BASE', $env:CANVAS_BASE, 'User')
 
-  $Every = [int](Ask "6. Refresh how often, in hours?" '4')
+  $Every = [int](Ask "6. Refresh how often, in hours?" '1')
 
   if (-not $StandupAt) {
     Write-Host ""
@@ -332,7 +332,7 @@ if (($cfg.agents -contains 'codex') -and -not (Get-Command git -EA SilentlyConti
 $wsIgnore = Join-Path $Root '.gitignore'
 $wantIgnore = @(
   'courses.json', 'DUE.md', 'CHANGES.md', 'STANDUP.md', 'canvas-deadlines.ics',
-  '.canvas-snapshot.json',
+  '.canvas-snapshot.json', '.standup-seen.json',
   '*/canvas/', '*/sources/', '*/work/', '*/submissions/',
   '*/STATUS.md', '*/AGENTS.md', '*/CLAUDE.md', '*/GEMINI.md'
 )

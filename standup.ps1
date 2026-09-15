@@ -33,6 +33,10 @@ function LocalDue($v) {
 }
 function MdCell($t) { ([string]$t) -replace '\|', '\|' }
 
+# The watcher refreshes hourly, so three missed hours is a stopped watcher, not
+# a slow one. Raise this if you deliberately set -Every higher than 1.
+$STALE_H = 3
+
 $cfg = Get-Content $cfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $now = Get-Date
 $items = @()
@@ -64,6 +68,34 @@ foreach ($c in @($cfg.courses)) {
   }
 }
 
+# ---------------- what changed since the last standup ----------------
+# Its own seen-state, independent of the watcher's snapshot: the watcher records
+# what Canvas looked like, this records what YOU were last told. An instructor
+# posting eleven new assignments at 7pm should be the first line you read.
+$seenPath = Join-Path $Root '.standup-seen.json'
+$seen = @{}
+if (Test-Path $seenPath) {
+  $rawSeen = Get-Content $seenPath -Raw -Encoding UTF8 -EA SilentlyContinue
+  if (-not [string]::IsNullOrWhiteSpace($rawSeen)) {
+    try { (ConvertFrom-Json $rawSeen).PSObject.Properties | ForEach-Object { $seen[$_.Name] = $_.Value } } catch { }
+  }
+}
+$firstRun = ($seen.Count -eq 0)
+$nowSeen = @{}
+$newItems = @(); $movedItems = @()
+foreach ($x in $items) {
+  $k = "$($x.CourseId):$($x.Id)"
+  $stamp = "$($x.Due.ToString('yyyy-MM-ddTHH:mm'))|$($x.Pts)"
+  $nowSeen[$k] = $stamp
+  if (-not $firstRun) {
+    if (-not $seen.ContainsKey($k)) { $newItems += $x }
+    elseif ($seen[$k] -ne $stamp) {
+      $wasDue = ($seen[$k] -split '\|')[0]
+      $movedItems += [pscustomobject]@{ Item = $x; Was = $wasDue }
+    }
+  }
+}
+
 $today   = @($items | Where-Object { $_.Due.Date -eq $now.Date -and $_.Due -ge $now } | Sort-Object Due)
 $overdue = @($items | Where-Object { $_.Due -lt $now } | Sort-Object Due -Descending)
 $window  = @($items | Where-Object { $_.Due -gt $now -and $_.Due.Date -ne $now.Date -and $_.Due -le $now.AddDays($Days) } | Sort-Object Due)
@@ -74,9 +106,36 @@ $age = if ($oldest) { [int]($now - $oldest).TotalHours } else { -1 }
 $md = @()
 $md += "# Standup - $($now.ToString('dddd, MMMM d, yyyy h:mm tt'))"
 $md += ""
-$md += "_Canvas mirror is $(if ($age -lt 0) { 'missing' } else { "$age h old" }). Confirm anything time-critical in Canvas itself._"
+if ($age -lt 0) {
+  $md += "> **The Canvas mirror is missing.** Nothing below is trustworthy. Run ``.\canvas-watch.ps1`` first."
+} elseif ($age -gt $STALE_H) {
+  $md += "> **The Canvas mirror is $age h old** - the hourly watcher has missed about $age runs, so anything added or moved since then is not shown here. Run ``.\doctor.ps1`` to find out why, or ``.\standup.ps1 -Refresh`` to update now."
+} else {
+  $md += "_Canvas mirror is $age h old. Confirm anything time-critical in Canvas itself._"
+}
 $md += ""
 $md += "**$($overdue.Count) past due - $($today.Count) due today - $($window.Count) in the next $Days days ($($graded.Count) worth points)**"
+$md += ""
+
+$md += "## Since your last standup"
+$md += ""
+if ($firstRun) {
+  $md += "- First run, so nothing to compare against yet. From now on this section lists"
+  $md += "  anything newly posted or rescheduled."
+} elseif (-not $newItems.Count -and -not $movedItems.Count) {
+  $md += "- Nothing new or rescheduled."
+} else {
+  foreach ($x in ($newItems | Sort-Object Due)) {
+    $p = if ($x.Pts -gt 0) { " **($($x.Pts) pts)**" } else { "" }
+    $md += "- **NEW** $(MdCell $x.Course) - [$(MdCell $x.Name)]($($x.Url)) - due $($x.Due.ToString('ddd MMM dd, h:mm tt'))$p"
+  }
+  foreach ($m in ($movedItems | Sort-Object { $_.Item.Due })) {
+    $x = $m.Item
+    $md += "- **MOVED** $(MdCell $x.Course) - [$(MdCell $x.Name)]($($x.Url)) - was $($m.Was), now $($x.Due.ToString('ddd MMM dd, h:mm tt'))"
+  }
+  $newPts = ($newItems | Measure-Object Pts -Sum).Sum
+  if ($newPts -gt 0) { $md += ""; $md += "_$($newItems.Count) new item(s) worth $newPts points._" }
+}
 $md += ""
 
 $md += "## Due today"
@@ -174,7 +233,7 @@ if (-not $Quiet) {
   Write-Host ""
   Write-Host "STANDUP  $($now.ToString('ddd MMM dd, h:mm tt'))" -F Cyan
   Write-Host ("  {0} past due | {1} due today | {2} in {3} days ({4} graded)" -f $overdue.Count, $today.Count, $window.Count, $Days, $graded.Count)
-  if ($age -gt 5) { Write-Warning "Canvas mirror is $age h old. Run with -Refresh for current data." }
+  if ($age -gt $STALE_H) { Write-Warning "Canvas mirror is $age h old - the hourly watcher has missed about $age runs. Check it with doctor.ps1, or refresh now with -Refresh." }
   Write-Host ""
   if ($today.Count) {
     Write-Host "TODAY" -F Yellow
@@ -192,5 +251,21 @@ if (-not $Quiet) {
     foreach ($x in ($overdue | Select-Object -First 5)) { "  {0,-13} {1,-12} {2}" -f $x.Due.ToString('MMM dd'), $x.Course, $x.Name }
     Write-Host ""
   }
+  if ($newItems.Count -or $movedItems.Count) {
+    Write-Host "SINCE LAST STANDUP" -F Magenta
+    foreach ($x in ($newItems | Sort-Object Due | Select-Object -First 8)) {
+      "  NEW    {0,-12} {1}{2}" -f $x.Course, $x.Name, $(if ($x.Pts -gt 0) { " ($($x.Pts) pts)" } else { '' })
+    }
+    if ($newItems.Count -gt 8) { "  ...and $($newItems.Count - 8) more new" }
+    foreach ($m in ($movedItems | Select-Object -First 5)) {
+      "  MOVED  {0,-12} {1}  (was {2})" -f $m.Item.Course, $m.Item.Name, $m.Was
+    }
+    Write-Host ""
+  }
   Write-Host "Written: STANDUP.md and canvas-deadlines.ics" -F DarkGray
 }
+
+# Record what the owner has now been told. Written LAST, so a crash before this
+# point leaves the old state and the same changes are reported again rather than
+# being silently swallowed.
+WriteUtf8 $seenPath (ConvertTo-Json -InputObject $nowSeen -Depth 3)

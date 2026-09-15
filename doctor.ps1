@@ -77,11 +77,37 @@ if ($Fast) {
     }
   }
   if ($agy) {
+    # agy -p starts with empty context and PS 5.1 mangles quotes, so pipe stdin.
     $o = ("reply OK" | & $agy 2>&1 | Out-String)
     if ($o -match 'not logged in|sign in|unauthori') { Say 'WARN' 'Antigravity not signed in' 'launch: agy' }
     else { Say 'OK' 'Antigravity answered a prompt' }
   }
-  Say 'INFO' 'Claude Code and Codex not auto-probed' 'start each one and ask it to read a file in this folder'
+  if (HasCmd 'claude') {
+    $o = (& claude -p "reply OK" 2>&1 | Out-String)
+    if ($o -match 'not logged in|/login|unauthori|Invalid API key') { Say 'WARN' 'Claude Code not signed in' 'run: claude  then /login' }
+    elseif ([string]::IsNullOrWhiteSpace($o)) { Say 'WARN' 'Claude Code returned nothing' 'start it interactively to check' }
+    else { Say 'OK' 'Claude Code answered a prompt' }
+  }
+  if (HasCmd 'codex') {
+    # Codex refuses a folder that is not a git repo, which is a DIFFERENT failure
+    # from not being signed in. Report them separately or the fix is a guess.
+    #
+    # Probe from inside a class folder, not the workspace root. Each class is its
+    # own repo and the root deliberately is not one, so probing the root reports
+    # a git failure that does not exist where you actually work - and the obvious
+    # fix, git init at the root, would wrap every class repo inside a twelfth.
+    $probeDir = @(Get-ChildItem $Root -Directory -EA SilentlyContinue |
+                  Where-Object { Test-Path (Join-Path $_.FullName '.git') })[0]
+    Push-Location ($(if ($probeDir) { $probeDir.FullName } else { $Root }))
+    try { $o = (& codex exec "reply OK" 2>&1 | Out-String) } finally { Pop-Location }
+    if ($o -match 'not inside a trusted directory') {
+      if ($probeDir) { Say 'WARN' "Codex refused '$($probeDir.Name)' even though it is a git repo" 'run codex there once and approve the folder when it asks' }
+      else { Say 'WARN' 'Codex needs a git repo, and no class folder is one' 'rerun setup.ps1, which git-inits each class' }
+    }
+    elseif ($o -match 'not logged in|sign in|unauthori') { Say 'WARN' 'Codex not signed in' 'run: codex  and choose ChatGPT sign-in' }
+    elseif ([string]::IsNullOrWhiteSpace($o)) { Say 'WARN' 'Codex returned nothing' 'start it interactively to check' }
+    else { Say 'OK' "Codex answered a prompt$(if ($probeDir) { " (in $($probeDir.Name))" })" }
+  }
 }
 Write-Host ""
 
@@ -143,13 +169,25 @@ Write-Host ""
 Write-Host "5. Canvas mirror and schedule" -F Cyan
 if (Test-Path (Join-Path $Root 'DUE.md')) {
   $age = [int]((Get-Date) - (Get-Item (Join-Path $Root 'DUE.md')).LastWriteTime).TotalHours
-  if ($age -le 12) { Say 'OK' "DUE.md refreshed $age h ago" } else { Say 'WARN' "DUE.md is $age h old" 'run canvas-watch.ps1, or check the scheduled task' }
+  # The watcher runs hourly, so a mirror more than 3 h old means it has failed
+  # repeatedly - not that it is merely due for its next refresh.
+  if ($age -le 3) { Say 'OK' "DUE.md refreshed $age h ago" } else { Say 'WARN' "DUE.md is $age h old - about $age missed hourly runs" 'run canvas-watch.ps1, and check the scheduled task below' }
 } else { Say 'FAIL' 'DUE.md missing' 'run canvas-watch.ps1' }
 $task = Get-ScheduledTask | Where-Object { $_.TaskName -like '*Canvas*' } | Select-Object -First 1
 if ($task) {
   $i = Get-ScheduledTaskInfo -TaskName $task.TaskName
-  if ($i.LastTaskResult -eq 0) { Say 'OK' "scheduled task '$($task.TaskName)' healthy" "next run $($i.NextRunTime)" }
-  else { Say 'WARN' "scheduled task last exited $($i.LastTaskResult)" $task.TaskName }
+  $rc = [uint32]$i.LastTaskResult
+  # Task Scheduler reports these as huge unsigned decimals. The two you will
+  # actually meet are worth translating; anything else gets the hex to search.
+  $why = switch ($rc) {
+    0          { $null }
+    267009     { 'it is running right now - not a failure' }
+    267011     { 'it has not run yet' }
+    4294770688 { "the workspace drive was offline when it fired (Google Drive not running), so it could not reach $Root" }
+    default    { 'look up the hex code, or run canvas-watch.ps1 by hand to see the real error' }
+  }
+  if ($rc -eq 0) { Say 'OK' "scheduled task '$($task.TaskName)' healthy" "next run $($i.NextRunTime)" }
+  else { Say 'WARN' ("scheduled task last exited 0x{0:X8}" -f $rc) "$why  [$($task.TaskName), last ran $($i.LastRunTime)]" }
 } else { Say 'WARN' 'no Canvas scheduled task found' 'rerun setup.ps1 without -NoSchedule' }
 Write-Host ""
 
