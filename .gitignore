@@ -1,0 +1,14 @@
+# The workspace root doubles as the tool repo. Track only the tool; the class
+# folders, mirrors, and snapshots it generates are personal and stay local.
+*
+!.gitignore
+!README.md
+!SKILL.md
+!AGENTS.md
+!CLAUDE.md
+!GEMINI.md
+!setup.ps1
+!canvas-watch.ps1
+!scaffold-class.ps1
+!templates/
+!templates/**

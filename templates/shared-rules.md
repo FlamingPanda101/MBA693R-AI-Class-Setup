@@ -1,0 +1,70 @@
+# Shared rules for every class folder
+
+Owner: {{OWNER}}. These rules apply to any AI agent working in any class folder
+in this workspace. The class-specific facts come after this block.
+
+## Scope
+An agent working in a class folder works **only in that folder**. Do not read
+or write another class's folder, or anything outside the workspace root.
+
+Workspace-level files are read-only to a class agent: `courses.json`, `DUE.md`,
+`CHANGES.md`, the `.ps1` scripts, and `templates\`. Only the owner or a run of
+the watcher changes those.
+
+## Layout (identical in every class folder)
+- `canvas\`      - generated Canvas mirror. **Never edit by hand; it is overwritten.**
+- `sources\`     - readings, exports, screenshots, reference material
+- `work\`        - drafts, scratch, in-progress artifacts
+- `submissions\` - final copies of what was submitted, one folder per assignment
+- `STATUS.md`    - current state, next step, open questions. Read it first, update it last.
+
+## Rules
+1. **One writer at a time.** A second agent may review a *copy*, not the original.
+2. **Human approval stays on** for sending, deleting, purchasing, deploying, or
+   changing access. No permission-bypass or auto-approve flags.
+3. **Never submit anything.** Agents prepare work. The owner submits it.
+4. **No secrets.** Never write passwords, API keys, or account tokens into any
+   file here, and never paste them into a chat or a screenshot. `CANVAS_TOKEN`
+   lives in the Windows user environment, outside this folder, on purpose.
+5. **ZIPs contain only requested project files** - no credentials, no
+   `node_modules`, no whole-folder dumps.
+6. **Verify deadlines in Canvas**, not from a local copy. `canvas\` and `DUE.md`
+   are refreshed on a schedule and can be hours behind. Items submitted on paper
+   or marked as attendance never show as "submitted" in Canvas at all.
+7. **Cite or flag.** Check citations and numbers before stating them. Say what
+   you are unsure about instead of smoothing it over.
+8. **Academic honesty.** Each course sets its own AI policy, recorded in that
+   course's `AGENTS.md`. Where a course has not stated one, assume AI may help
+   you think and draft but that you must be able to explain and defend every
+   submitted line. When a course forbids AI on an assignment, agents do not
+   draft it - they may still quiz, explain, or check comprehension.
+
+## Canvas data
+`canvas-watch.ps1` at the workspace root refreshes every class on a schedule.
+It is read-only: it never submits, never changes grades, never sends messages.
+
+- `..\DUE.md`             - everything outstanding across all classes, by date
+- `..\CHANGES.md`         - what changed since the last run
+- `canvas\assignments.md` - full text of this class's assignments
+
+## The three CLIs
+| Agent | Reads | How it gets these rules |
+|---|---|---|
+| Claude Code | `CLAUDE.md` | contains `@AGENTS.md` |
+| Antigravity (`agy`) | `GEMINI.md` | contains `@AGENTS.md` |
+| Codex (`codex exec`) | `AGENTS.md` | native |
+
+Known quirks:
+- A markdown link does **not** import. It must be `@AGENTS.md` on its own line.
+- Imports resolve at session start. Restart the agent after editing rules.
+- `agy -p` (print mode) loads no context; interactive `agy` does.
+- Codex refuses folders that are not git repos: run `git init` in the class folder once.
+- Launch from the class folder. If the banner shows `~`, no rules loaded.
+
+## Bounded reviewer
+The primary agent may request exactly one bounded review from another CLI:
+
+    codex exec "Read AGENTS.md and STATUS.md. Review the stated next step. Return three risks. Do not edit files or start another agent."
+
+Run one, not all three. The reviewer reports findings only - no edits, no
+spawning further agents. Summarize findings into this class's STATUS.md.
