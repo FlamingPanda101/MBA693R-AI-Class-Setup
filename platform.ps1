@@ -209,6 +209,59 @@ function Get-CanvasTokenInstructions($hintBase) {
 "@
 }
 
+# ------------------------------------------------- the notifier's credential
+# A second secret, kept the same way as the Canvas token: the Windows user
+# environment, or the macOS login Keychain. Never a file, never printed.
+$script:NOTIFY_SERVICE = 'canvas-workspace-notify'
+
+function Get-CanvasNotifyKey {
+  param([switch]$Fresh)
+  if ($env:CANVAS_NOTIFY_KEY -and -not $Fresh) { return $env:CANVAS_NOTIFY_KEY }
+  if ((Get-CanvasPlatform) -eq 'windows') {
+    return [Environment]::GetEnvironmentVariable('CANVAS_NOTIFY_KEY', 'User')
+  }
+  if (-not (Test-CanvasReal)) { return $null }
+  if ((Get-CanvasPlatform) -eq 'linux') {
+    if (-not (Get-Command secret-tool -EA SilentlyContinue)) { return $null }
+    $v = & secret-tool lookup service $script:NOTIFY_SERVICE 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($v)) { return $null }
+    return ([string]$v).Trim()
+  }
+  if (-not (Get-Command security -EA SilentlyContinue)) { return $null }
+  $v = & security find-generic-password -a $env:USER -s $script:NOTIFY_SERVICE -w 2>$null
+  if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($v)) { return $null }
+  return ([string]$v).Trim()
+}
+
+function Get-CanvasNotifyKeyInstructions {
+  if ((Get-CanvasPlatform) -eq 'windows') {
+    return @"
+  Copy the API key CallMeBot sent you, then in Windows PowerShell run:
+
+      [Environment]::SetEnvironmentVariable('CANVAS_NOTIFY_KEY', (Get-Clipboard), 'User'); Set-Clipboard -Value 'cleared'
+
+  It takes the key from your clipboard so it never appears on screen or in
+  your shell history, then wipes the clipboard.
+"@
+  }
+  if ((Get-CanvasPlatform) -eq 'linux') {
+    return @"
+  Copy the API key CallMeBot sent you, then run:
+
+      secret-tool store --label='Canvas notify' service $($script:NOTIFY_SERVICE)
+
+  It prompts for the key and reads it silently.
+"@
+  }
+  return @"
+  Copy the API key CallMeBot sent you, then in Terminal run - note the bare -w:
+
+      security add-generic-password -a "`$USER" -s $($script:NOTIFY_SERVICE) -U -w
+
+  It prompts for the key and reads it silently. Then: pbcopy < /dev/null
+"@
+}
+
 function Get-CanvasBaseFixInstructions {
   # How to correct a wrong Canvas host. Lives here, not in the caller, so that
   # "only platform.ps1 knows the difference" stays literally true - a Windows

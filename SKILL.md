@@ -360,6 +360,32 @@ Finish by asking whether anything was unclear, and say they can come back any
 time - to add a class, change the rules, change how often it checks, or work on
 an actual assignment. Do not end on a wall of text; end on their question.
 
+## A daily brief on their phone
+
+Offer this once the workspace is built and they have seen a standup. It is the
+feature people actually keep using, because it arrives without being asked for.
+
+    <pwsh> -File <workspace>/notify.ps1 -Setup
+
+Walk them through it rather than dumping the steps: they add a contact, send it
+one sentence on WhatsApp, and paste the key it replies with into the command the
+script prints. Then `-DryRun` to show them the message before anything is sent,
+and `-ScheduleAt 07:30` to make it daily.
+
+Three things to say plainly, before they set it up and not after:
+- It goes to **them, not a group**. WhatsApp groups need a verified business
+  account through Meta's Groups API. Telegram does groups trivially if they want
+  that instead - offer it rather than implying WhatsApp can be made to work.
+- The message passes through CallMeBot's relay, so course names and assignment
+  titles are "not secret" rather than private. Their grades are not in it, but
+  "6 items past due" is still their business.
+- **Never** offer to put a Canvas token, password or key in a message. The brief
+  is deadlines only, and `notify.ps1` has no recipient argument on purpose.
+
+If they ask for a group version, do not reuse this message. A group brief should
+carry shared facts - what is due for this class, when the exam is - and drop the
+personal "N pts at risk" section entirely.
+
 ## Steering it later
 
 Every path is in the **workspace**, not this tool folder - the workspace copies

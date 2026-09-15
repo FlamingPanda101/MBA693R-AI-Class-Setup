@@ -83,6 +83,32 @@ delete it afterwards.
 
 </details>
 
+## A daily brief on your phone
+
+`notify.ps1` sends a short, lock-screen-sized version of the standup to your own
+WhatsApp: what's due, what's genuinely at risk, and the big items far enough
+ahead that you can still do something about them.
+
+```powershell
+.\notify.ps1 -Setup             connect it (walks you through the whole thing)
+.\notify.ps1 -DryRun            show exactly what would be sent, send nothing
+.\notify.ps1                    send it now
+.\notify.ps1 -ScheduleAt 07:30  send it every morning
+.\notify.ps1 -Unschedule        stop
+```
+
+It sends **only** to the number you record during setup. There is deliberately
+no recipient argument. The provider's API key is stored by your operating system
+— the Windows user environment or the macOS login Keychain — never in a file
+here, and never printed, including on errors.
+
+Two honest limits. It goes to **you, not a group**: WhatsApp groups need a
+verified business account through Meta's Groups API, which this is not. And the
+message text passes through CallMeBot's relay, so treat course names and
+assignment titles as "not secret" rather than "private". If you want a group, or
+you want no third party in the path, Telegram's bot API does the same job in
+about five minutes — ask your assistant to add it.
+
 ## Using it afterwards
 
 You still do not type commands. Ask your assistant in plain language:

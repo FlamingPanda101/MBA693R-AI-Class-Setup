@@ -14,6 +14,7 @@
 !setup.cmd
 !setup.sh
 !platform.ps1
+!notify.ps1
 !canvas-watch.ps1
 !scaffold-class.ps1
 !standup.ps1

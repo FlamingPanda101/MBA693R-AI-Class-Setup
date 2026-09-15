@@ -11,7 +11,25 @@ into Google Calendar, Outlook or Apple Calendar.
 Reads only what canvas-watch.ps1 already mirrored, so it needs no token, no
 network and no Canvas call. It never submits, grades or messages anything.
 #>
-param([switch]$Refresh, [int]$Days = 7, [switch]$Quiet)
+param(
+  [switch]$Refresh, [int]$Days = 7, [switch]$Quiet,
+  # -Brief prints a short, phone-sized version instead of the full report: what
+  # is due now, what is genuinely at risk, and the big items far enough ahead to
+  # still do something about. Written to be read on a lock screen, so it is
+  # ruthless about length - the full picture stays in STANDUP.md.
+  [switch]$Brief,
+  # Points at or above this count as a "big" item worth flagging early. Measured
+  # from this student's own data, not guessed: the median graded item is 5
+  # points and the 75th percentile is 30, so 30 is the natural break between
+  # routine work and the things that need a running start.
+  [int]$BigPts = 30,
+  # How far ahead to look for those big items.
+  [int]$HorizonDays = 30,
+  # Overdue by more than this is treated as a rolled-over shell from a previous
+  # term rather than live work, and is counted separately so it cannot inflate
+  # the points-at-risk figure.
+  [int]$StaleDays = 45
+)
 $ErrorActionPreference = 'Stop'
 $Root = $PSScriptRoot
 $cfgPath = Join-Path $Root 'courses.json'
@@ -214,6 +232,87 @@ $md += "_Zero-point rows are usually readings or attendance. Rows marked paper a
 $md += "handed in physically, so Canvas never shows them submitted._"
 
 WriteUtf8 (Join-Path $Root 'STANDUP.md') ($md -join "`n")
+
+# ---------------- the phone brief ----------------
+# A different question from STANDUP.md. That one answers "show me everything";
+# this one answers "what do I do today, and what is about to land on me". It
+# goes to a lock screen, so anything that does not change a decision is cut.
+function Get-CanvasBrief {
+  $b = @()
+  $b += "*Canvas - $($now.ToString('ddd MMM d'))*"
+
+  $tomorrow = @($items | Where-Object { $_.Due.Date -eq $now.Date.AddDays(1) } | Sort-Object Due)
+  if ($today.Count) {
+    $b += ''
+    $b += "*Due today*"
+    foreach ($x in $today) { $b += "- $($x.Due.ToString('h:mm tt')) $($x.Course) - $($x.Name)$(if ($x.Pts -gt 0) { " ($([int]$x.Pts) pts)" })" }
+  }
+  if ($tomorrow.Count) {
+    $b += ''
+    $b += "*Tomorrow*"
+    foreach ($x in $tomorrow) { $b += "- $($x.Course) - $($x.Name)$(if ($x.Pts -gt 0) { " ($([int]$x.Pts) pts)" })" }
+  }
+  if (-not $today.Count -and -not $tomorrow.Count) { $b += ''; $b += 'Nothing due today or tomorrow.' }
+
+  # Overdue, but only the part that actually costs marks AND is still live.
+  # Two filters, both earned the hard way:
+  #  - 0-point rows are readings and attendance markers; a wall of them buries
+  #    the two or three items that are genuinely bleeding points.
+  #  - Anything months overdue is a rolled-over shell from a previous term, not
+  #    work anyone can still hand in. One such 100-point ghost made this brief
+  #    announce "114 pts at risk" when the real, actionable figure was 14. A
+  #    number that is wrong in the alarming direction teaches you to ignore it.
+  $stale = @($overdue | Where-Object { $_.Pts -gt 0 -and ($now - $_.Due).TotalDays -gt $StaleDays })
+  $risk  = @($overdue | Where-Object { $_.Pts -gt 0 -and ($now - $_.Due).TotalDays -le $StaleDays } | Sort-Object Pts -Descending)
+  if ($risk.Count) {
+    $lost = [int](($risk | Measure-Object -Property Pts -Sum).Sum)
+    $b += ''
+    $b += "*Past due - $($risk.Count) item(s), $lost pts at risk*"
+    foreach ($x in @($risk | Select-Object -First 4)) {
+      $late = [int]($now - $x.Due).TotalDays
+      $b += "- $($x.Course) - $($x.Name) ($([int]$x.Pts) pts, $late d late)"
+    }
+    if ($risk.Count -gt 4) { $b += "- ...and $($risk.Count - 4) more" }
+  }
+  if ($stale.Count) {
+    $b += "_($($stale.Count) older item(s) over $StaleDays d past due not counted - probably last term's.)_"
+  }
+
+  # The actual ask: bigger projects and events, surfaced while there is still
+  # time to act. Deliberately EXCLUDES the next 48h, which is covered above.
+  $big = @($items |
+    Where-Object { $_.Due -gt $now.Date.AddDays(2) -and $_.Due -le $now.AddDays($HorizonDays) -and $_.Pts -ge $BigPts } |
+    Sort-Object Due)
+  if ($big.Count) {
+    $b += ''
+    $b += "*Start early - next $HorizonDays days*"
+    foreach ($x in @($big | Select-Object -First 6)) {
+      $inDays = [int]($x.Due.Date - $now.Date).TotalDays
+      $tag = if ($x.Name -match '(?i)exam|midterm|final|quiz|testing cent') { ' [exam]' } else { '' }
+      $b += "- $($x.Due.ToString('MMM d')) (${inDays}d) $($x.Course) - $($x.Name) - $([int]$x.Pts) pts$tag"
+    }
+    if ($big.Count -gt 6) { $b += "- ...and $($big.Count - 6) more over $BigPts pts" }
+  }
+
+  if ($newItems.Count -or $movedItems.Count) {
+    $b += ''
+    $b += "*Changed since yesterday*"
+    foreach ($x in @($newItems | Select-Object -First 3)) { $b += "- NEW: $($x.Course) - $($x.Name)" }
+    foreach ($m in @($movedItems | Select-Object -First 3)) { $b += "- MOVED: $($m.Item.Course) - $($m.Item.Name) -> $($m.Item.Due.ToString('MMM d'))" }
+  }
+  if ($missing.Count) { $b += ''; $b += "_$($missing.Count) class(es) missing from this brief - mirror not written._" }
+  if ($age -gt $STALE_H) { $b += ''; $b += "_Canvas data is $age h old._" }
+  return ($b -join "`n")
+}
+
+if ($Brief) {
+  $briefText = Get-CanvasBrief
+  WriteUtf8 (Join-Path $Root 'BRIEF.txt') $briefText
+  if (-not $Quiet) { Write-Output $briefText }
+  # -Brief means "give me the short version", so the full console report that
+  # normally follows would defeat the point. STANDUP.md is still written.
+  exit 0
+}
 
 # ---------------- calendar export ----------------
 # RFC 5545. Escape TEXT values and fold lines at 75 octets, or strict importers
