@@ -9,36 +9,85 @@ your machine and is never written to a file.
 
 ## Install (Windows, PowerShell 5.1 or later)
 
-**With Claude Code** - paste the repo link and say "set up my Canvas workspace".
-The skill walks you through it.
+You need **one** of Claude Code, Codex, or Antigravity - not all three.
 
-**With Codex or Antigravity** - clone, then open the folder in the agent and
-say the same thing. `AGENTS.md` / `GEMINI.md` point it at the procedure.
+**With any of them** - paste the repo link and say "set up my Canvas workspace".
+It asks you seven questions, then does the rest:
+
+1. Have you already set this up on another computer?
+2. Do you have Google Drive on this machine, and should the workspace live there?
+3. Where should the workspace live?
+4. Which AI coding tools do you use? (only those get instruction files)
+5. Which school's Canvas?
+6. How often should it check?
+7. Want a daily standup, and at what time?
+
+**Ask it anything as you go.** It has the full instructions and can explain any
+step, redo one, or change an answer later.
+
+**No AI assistant?** `powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Interview`
+asks you the same seven questions from the terminal.
+
+**The standup**, whether or not you scheduled one:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\standup.ps1
+```
+
+Prints what is due today, what is coming in the next 7 days, and what is past
+due; rewrites `STANDUP.md`; and refreshes `canvas-deadlines.ics` for your
+calendar. Add `-Refresh` to pull Canvas first, `-Days 14` for a wider window.
+
+**Picture guides** (prompts you can feed to any image model - see `docs\`):
+- [How to use the repo link](docs/image-prompt-repo-link.md)
+- [How to get your Canvas API token](docs/image-prompt-canvas-token.md)
+
+**Want your Slack, email and calendar in there too?**
+See [Connecting Slack, email and calendar](docs/connect-slack-email-calendar.md).
+Your Canvas deadlines go into Google/Outlook/Apple Calendar with no accounts at
+all - `standup.ps1` writes a `.ics` file you just import. Live connections to
+mail and Slack are a separate, bigger decision, and that guide covers both.
 
 **By hand** - three steps:
 
 1. Canvas -> Account -> Settings -> **+ New Access Token**. Copy it.
-2. Run exactly this:
+2. Open **Windows PowerShell** — *not* Command Prompt, not the black `cmd`
+   window — and run exactly this:
 
    ```powershell
-   setx CANVAS_TOKEN (Get-Clipboard); Set-Clipboard -Value 'cleared'
+   [Environment]::SetEnvironmentVariable('CANVAS_TOKEN', (Get-Clipboard), 'User'); Set-Clipboard -Value 'cleared'
    ```
 
-   The first half reads the token from your clipboard so it never appears on
-   screen or in your shell history. The second wipes the clipboard, so a stray
-   Ctrl+V cannot paste your token into a chat window. Using Win+V clipboard
-   history? Clear it too: Settings > System > Clipboard.
-   (Not BYU? Also `setx CANVAS_BASE https://yourschool.instructure.com`.)
+   It takes the token straight from your clipboard, so it never appears on
+   screen or in your shell history, then wipes the clipboard so a stray Ctrl+V
+   cannot paste it into a chat window. Using Win+V clipboard history? Clear it
+   too: Settings > System > Clipboard.
+
+   > **Why not `setx`?** `setx` receives the token as a command-line argument,
+   > and Windows process auditing and most corporate EDR agents record full
+   > command lines. On a managed laptop that ships your token to a central log.
+   > The line above sets the same value in-process, with no child process.
+   >
+   > **Why PowerShell specifically?** `Get-Clipboard` does not exist in Command
+   > Prompt, and it fails *silently* — cmd stores the literal text
+   > `(Get-Clipboard)` and prints `SUCCESS`, so you would think you were done.
+
+   (Not BYU? Also set `CANVAS_BASE` to `https://yourschool.instructure.com` the
+   same way. It must start with `https://`.)
 3. ```powershell
-   powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Root C:\Users\you\School
+   powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Root C:\Users\you\School -Agents claude
    ```
+
+   `-Agents` takes any subset of `claude,codex,antigravity`; omit it to get all
+   three. Add `-Reuse` if this workspace already came from another computer -
+   setup will adopt it instead of rebuilding.
 
 `-Root` must be a different folder from this repo. Setup greets you by name,
 discovers your courses, builds the folders, `git init`s each one, takes the
 first snapshot, and schedules a refresh every 4 hours.
 
-No new terminal needed: the scripts read the value `setx` wrote directly, so
-they work immediately - including when an AI agent runs them for you.
+No new terminal needed: the scripts read the User-scope value directly, so they
+work immediately - including when an AI agent runs them for you.
 
 ## What you get
 
@@ -67,6 +116,8 @@ repo - the workspace copies are the ones that actually run. Reruns need
 | Want to... | Do this |
 |---|---|
 | Skip a course | `"enabled": false` in `courses.json`, rerun setup |
+| Add or drop an AI tool | rerun setup with `-Agents claude,antigravity` |
+| Move to a new computer | install Drive (or copy the folder), then rerun setup with `-Reuse` |
 | Rename a class folder | edit `folder` in `courses.json` before first run |
 | New semester | rerun setup - new courses merge in, your edits are kept |
 | Change a shared rule | edit `templates\shared-rules.md`, then run the scaffold command below |
@@ -94,9 +145,16 @@ markers survive.
 
 ## Requirements
 
-Windows 10/11, PowerShell 5.1+, a Canvas account. Git is optional, but install
-it if you use Codex: Codex refuses any folder that is not a git repo, and when
-git is present the tool runs `git init` in each class folder for you.
+Windows 10/11, Windows PowerShell 5.1+, a Canvas account.
+
+**Using Codex? You also need Git** (`winget install Git.Git`, or git-scm.com).
+Codex refuses any folder that is not a git repository. When git is present the
+tool runs `git init` in each class folder for you; when it is absent, setup
+warns you and the folders are created anyway, but Codex will not open them.
+
+Each class folder gets a `.gitignore` that excludes your Canvas mirror, notes
+and coursework, and so does the workspace root. Those repos exist so Codex will
+open the folders — they are not meant to be pushed anywhere.
 
 ## Origin
 

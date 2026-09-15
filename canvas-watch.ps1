@@ -21,11 +21,17 @@ if (-not $env:CANVAS_TOKEN) { Write-Error 'CANVAS_TOKEN is not set. Run setup.ps
 if (-not (Test-Path $MapPath)) { Write-Error 'courses.json not found. Run setup.ps1 first.' }
 $cfg  = Get-Content $MapPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $Base = if ($env:CANVAS_BASE) { $env:CANVAS_BASE.TrimEnd('/') } elseif ($cfg.base) { $cfg.base } else { 'https://byu.instructure.com' }
+# The Bearer header carries an unscoped, full-account token to whatever this says.
+# A plain-http value would put it on the wire in cleartext.
+if ($Base -notmatch '^https://[A-Za-z0-9.-]+$') {
+  Write-Error "Canvas address must be https:// and a plain host, e.g. https://yourschool.instructure.com - got '$Base'."
+}
 $Api  = "$Base/api/v1"
 
 if ($cfg.tokenExpires) {
   $days = ([datetime]$cfg.tokenExpires - (Get-Date)).Days
-  if ($days -lt 0)      { Write-Warning "CANVAS_TOKEN expired $($cfg.tokenExpires). Regenerate it, setx the new value, then update tokenExpires in courses.json." }
+  if ($days -lt 0)      { Write-Warning ("CANVAS_TOKEN expired $($cfg.tokenExpires). Make a new one, copy it, then run this in Windows PowerShell (not Command Prompt): " +
+                                         "[Environment]::SetEnvironmentVariable('CANVAS_TOKEN', (Get-Clipboard), 'User'); Set-Clipboard -Value 'cleared'  -  then update tokenExpires in courses.json.") }
   elseif ($days -le 14) { Write-Warning "CANVAS_TOKEN expires in $days day(s), on $($cfg.tokenExpires)." }
 }
 
@@ -72,10 +78,15 @@ function LocalDue($v) {
 function Save($text, $path, [switch]$Append) {
   $dir = Split-Path -Parent $path
   if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+  # UTF-8 WITHOUT a BOM. PS 5.1's "-Encoding UTF8" emits a BOM, and a BOM makes
+  # JSON.parse in Node and json.load in Python fail outright on courses.json and
+  # assignments.json - files this tool exists to hand to other programs.
+  $enc  = New-Object System.Text.UTF8Encoding($false)
+  $body = if ($text -is [array]) { $text -join "`r`n" } else { [string]$text }
   foreach ($i in 1..6) {
     try {
-      if ($Append) { Add-Content -LiteralPath $path -Value $text -Encoding UTF8 -EA Stop }
-      else         { Set-Content -LiteralPath $path -Value $text -Encoding UTF8 -EA Stop }
+      if ($Append) { [System.IO.File]::AppendAllText($path, $body + "`r`n", $enc) }
+      else         { [System.IO.File]::WriteAllText($path,  $body + "`r`n", $enc) }
       return
     } catch { Start-Sleep -Milliseconds (250 * $i) }
   }
