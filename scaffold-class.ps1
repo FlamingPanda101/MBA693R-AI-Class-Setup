@@ -35,7 +35,9 @@ $stamp = Get-Date -Format 'yyyy-MM-dd'
 foreach ($c in @($cfg.courses)) {
   if ($c.enabled -eq $false) { continue }
   $dir = Join-Path $Root $c.folder
-  foreach ($sub in 'sources', 'work', 'submissions') { New-Item -ItemType Directory -Force -Path (Join-Path $dir $sub) | Out-Null }
+  # skills\ is named by the course setup requirements alongside the other three;
+  # leaving it out means a student's folder does not match what was asked for.
+  foreach ($sub in 'sources', 'work', 'submissions', 'skills') { New-Item -ItemType Directory -Force -Path (Join-Path $dir $sub) | Out-Null }
 
   # This folder holds the student's name, grades and coursework. Write the
   # .gitignore BEFORE git init, so a repo never exists without it.

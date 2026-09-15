@@ -259,7 +259,7 @@ New-Item -ItemType Directory -Force -Path $Root | Out-Null
 $Root = (Resolve-Path $Root).Path
 if ($Root -ne $PSScriptRoot) {
   # Scripts are overwritten - that is how you take an update.
-  foreach ($f in 'setup.ps1', 'canvas-watch.ps1', 'scaffold-class.ps1', 'standup.ps1') { Copy-Item (Join-Path $PSScriptRoot $f) $Root -Force }
+  foreach ($f in 'setup.ps1', 'canvas-watch.ps1', 'scaffold-class.ps1', 'standup.ps1', 'doctor.ps1') { Copy-Item (Join-Path $PSScriptRoot $f) $Root -Force }
   New-Item -ItemType Directory -Force -Path (Join-Path $Root 'docs') | Out-Null
   Copy-Item (Join-Path $PSScriptRoot 'docs\*') (Join-Path $Root 'docs') -Force
   # Templates are NOT: shared-rules.md is yours to edit, and the docs say so.

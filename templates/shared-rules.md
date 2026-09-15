@@ -75,10 +75,37 @@ Known quirks:
 - Codex refuses folders that are not git repos: run `git init` in the class folder once.
 - Launch from the class folder. If the banner shows `~`, no rules loaded.
 
+## Layout (each class folder)
+`sources\` readings and exports, `work\` drafts, `submissions\` final copies of
+what was submitted, `skills\` reusable skills you build, `canvas\` the generated
+mirror, `STATUS.md` your notes.
+
+## Keep the conversation
+Where a course grades the transcript as well as the artifact, save the authentic
+conversation - including your own prompts - into
+`<class>\submissions\<assignment>\`. Do not tidy it into something that looks
+better than what happened. Never put a password, API key, or account token in
+there, and never ZIP a whole machine folder.
+
 ## Bounded reviewer
-The primary agent may request exactly one bounded review from another CLI:
+The primary agent may request exactly ONE bounded review from a different CLI.
+Run only the line for the reviewer you chose, not all of them:
 
+    claude -p "Read AGENTS.md and STATUS.md. Review the stated next step. Return three risks. Do not edit files or start another agent."
     codex exec "Read AGENTS.md and STATUS.md. Review the stated next step. Return three risks. Do not edit files or start another agent."
+    gemini -p "Read AGENTS.md and STATUS.md. Review the stated next step. Return three risks. Do not edit files or start another agent."
 
-Run one, not all three. The reviewer reports findings only - no edits, no
-spawning further agents. Summarize findings into this class's STATUS.md.
+The reviewer reports findings only - no edits, no spawning further agents.
+Summarize findings into this class's STATUS.md after the owner has checked them.
+Each call consumes that account's allowance. Do not use automatic approval or
+permission-bypass flags.
+
+**If `gemini` will not authenticate**, you are not doing it wrong. Google now
+returns `IneligibleTierError / UNSUPPORTED_CLIENT` for Gemini Code Assist on
+individual accounts and redirects to its Antigravity suite. Use its CLI instead:
+
+    "Read AGENTS.md and STATUS.md. Review the stated next step. Return three risks. Do not edit files or start another agent." | agy
+
+Pipe the prompt on stdin rather than `-p "..."`: PowerShell 5.1 mangles the
+quotes, and `agy -p` starts with an empty context so it would not see these
+rules anyway. See `docs\gemini-vs-antigravity.md`.

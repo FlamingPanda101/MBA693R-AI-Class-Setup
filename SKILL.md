@@ -174,6 +174,32 @@ A student with no AI assistant can run `.\setup.ps1 -Interview` and be asked
 questions 1-7 by the script itself. Question 8 (connecting Slack, email and
 calendar) is yours to walk them through - the script does not attempt it.
 
+## Checking the setup
+
+Any time they ask whether their setup is right - or before a setup deadline -
+run:
+
+    powershell -ExecutionPolicy Bypass -File <workspace>\doctor.ps1
+
+It reports which agents are installed, whether they actually authenticate (a
+version number proves installation, never sign-in), whether CLAUDE.md and
+GEMINI.md really import the shared rules, whether every class folder has
+sources, work, submissions and skills, and whether the Canvas mirror and
+scheduled task are healthy. `-Fast` skips the live agent calls so it uses none
+of their account allowance.
+
+It also prints what it does NOT check. Read that part out loud rather than
+letting a green report stand in for a finished setup assignment: the book, the
+benchmark and surveys, installing and signing into the CLIs, mobile access,
+saving the conversation into `submissions\`, and running the bounded review
+are all still theirs to do.
+
+**If Gemini CLI will not sign in**, it is not their mistake. Google returns
+`IneligibleTierError / UNSUPPORTED_CLIENT` for individual accounts and points
+at its Antigravity suite; `docs\gemini-vs-antigravity.md` has the exact error,
+the replacement CLI, and why Spark, Antigravity and Gemini CLI are three
+different things. Tell them to report the substitution to their instructor
+rather than quietly swapping tools.
 ## Running a standup
 
 Any time they ask - "what's due", "run my standup", "catch me up" - run:

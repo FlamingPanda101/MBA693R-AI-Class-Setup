@@ -143,6 +143,40 @@ therefore copies the shared block into each class's `AGENTS.md` between
 markers and refreshes only that block on rerun. Your own edits outside the
 markers survive.
 
+## What this does and does not do
+
+Built for a course that asks you to set up a private folder per class, two local
+AI agents with shared rules, and a bounded review between them. It covers the
+parts a script can:
+
+**Covered** - folder per class with `sources`, `work`, `submissions`, `skills`;
+`AGENTS.md` shared rules plus `CLAUDE.md` / `GEMINI.md` wired to them; a
+read-only Canvas mirror with a cross-class `DUE.md`; a standup; a calendar
+export; `doctor.ps1` to check the setup and say what is missing.
+
+**NOT covered, still yours** - buying and enrolling in the course book; any
+cold-benchmark or survey you are told to answer yourself; installing and signing
+into the agent CLIs; mobile agent access; saving your authentic conversation
+into `submissions\`; and actually running the bounded cross-agent review.
+
+`doctor.ps1` prints that same list every run, so a green report is never
+mistaken for a finished setup assignment:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\doctor.ps1
+```
+
+It checks which agents are installed, whether they authenticate (a version
+number proves neither), whether `CLAUDE.md` / `GEMINI.md` really import the
+shared rules, whether every class folder has all four subfolders, and whether
+the Canvas mirror and scheduled task are healthy. `-Fast` skips the live agent
+calls so it uses none of your account allowance.
+
+**If Gemini CLI will not sign in**, that is Google, not you - individual
+accounts now get `IneligibleTierError / UNSUPPORTED_CLIENT` and are pointed at
+the Antigravity suite. See [Gemini CLI, Antigravity and Spark](docs/gemini-vs-antigravity.md),
+which also explains why those three names are not interchangeable.
+
 ## Requirements
 
 Windows 10/11, Windows PowerShell 5.1+, a Canvas account.

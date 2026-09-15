@@ -13,6 +13,7 @@
 !canvas-watch.ps1
 !scaffold-class.ps1
 !standup.ps1
+!doctor.ps1
 !templates/
 !templates/**
 !docs/
