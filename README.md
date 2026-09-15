@@ -25,8 +25,22 @@ It asks you seven questions, then does the rest:
 **Ask it anything as you go.** It has the full instructions and can explain any
 step, redo one, or change an answer later.
 
-**No AI assistant?** `powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Interview`
-asks you the same seven questions from the terminal.
+**No AI assistant?** Get the files yourself first, then run the same interview.
+In **Windows PowerShell**:
+
+```powershell
+git clone https://github.com/FlamingPanda101/MBA693R-AI-Class-Setup.git
+cd MBA693R-AI-Class-Setup
+powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Interview
+```
+
+No Git? On the GitHub page click the green **Code** button, then **Download
+ZIP**, right-click the downloaded file, **Extract All**, and open Windows
+PowerShell in the extracted folder before running the third line.
+
+This folder is only the installer. It asks where your workspace should live and
+builds it there - your coursework never lives in the cloned copy, so you can
+delete it afterwards.
 
 **The standup**, whether or not you scheduled one:
 
