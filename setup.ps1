@@ -175,14 +175,39 @@ if ($Interview) {
     $agentList = $sel
   }
 
-  $schoolHost = Ask "5. Your Canvas address" $(if ($env:CANVAS_BASE) { $env:CANVAS_BASE } else { 'https://byu.instructure.com' })
-  # Persist it. Process scope dies with this run, and the next run would fall
-  # back to the BYU default and send a non-BYU student's full-account token to
-  # a school they have no relationship with. Set-CanvasBase writes the User env
-  # scope on Windows and ~/.config on macOS, where that scope does nothing.
+  # Default, most trustworthy source first. On the reuse path the workspace
+  # being adopted already records its own school, and offering BYU there would
+  # let a student press Enter and send their full-account token to a university
+  # they have no relationship with. Only accept a stored value that is still
+  # valid, so one bad answer cannot become a permanent un-Enter-past-able default.
+  $baseDefault = 'https://byu.instructure.com'
+  $recorded = $null
+  if ($Root) {
+    $rc = Join-Path $Root 'courses.json'
+    if (Test-Path $rc) { try { $recorded = (Get-Content $rc -Raw -Encoding UTF8 | ConvertFrom-Json).base } catch { } }
+  }
+  foreach ($cand in @($recorded, $env:CANVAS_BASE)) {
+    if ($cand -and ([string]$cand).TrimEnd('/') -match '^https://[A-Za-z0-9.-]+$') { $baseDefault = ([string]$cand).TrimEnd('/'); break }
+  }
+
+  # Validate BEFORE persisting. Set-CanvasBase writes the User env scope, and an
+  # invalid value stored there also breaks the scheduled watcher on every fire -
+  # silently, because nobody watches a hidden hourly job's output.
+  while ($true) {
+    $schoolHost = ([string](Ask "5. Your Canvas address" $baseDefault)).Trim().TrimEnd('/')
+    if ($schoolHost -match '^https://[A-Za-z0-9.-]+$') { break }
+    Write-Host "   Must be https:// and a plain host, e.g. https://yourschool.instructure.com - no path, no trailing slash." -F Yellow
+  }
   Set-CanvasBase $schoolHost
 
-  $Every = [int](Ask "6. Refresh how often, in hours?" '1')
+  # Not [int](...) directly: 5.1 throws a terminating cast error on "1 hour" or
+  # "hourly", which ends the interview and discards every answer so far.
+  while ($true) {
+    $everyRaw = ([string](Ask "6. Refresh how often, in hours?" '1')).Trim()
+    $n = 0
+    if ([int]::TryParse($everyRaw, [ref]$n) -and $n -ge 1 -and $n -le 24) { $Every = $n; break }
+    Write-Host "   Enter a whole number of hours between 1 and 24. Hourly (1) keeps you most current." -F Yellow
+  }
 
   if (-not $StandupAt) {
     Write-Host ""

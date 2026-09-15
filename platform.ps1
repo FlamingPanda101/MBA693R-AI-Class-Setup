@@ -123,6 +123,14 @@ function Get-CanvasToken {
     return [Environment]::GetEnvironmentVariable('CANVAS_TOKEN', 'User')
   }
   if (-not (Test-CanvasReal)) { return $null }
+  if ((Get-CanvasPlatform) -eq 'linux') {
+    # Linux has no single built-in store. libsecret is the closest common one;
+    # if it is absent there is nothing to read and the caller prompts.
+    if (-not (Get-Command secret-tool -EA SilentlyContinue)) { return $null }
+    $v = & secret-tool lookup service $script:KEYCHAIN_SERVICE 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($v)) { return $null }
+    return ([string]$v).Trim()
+  }
   if (-not (Get-Command security -EA SilentlyContinue)) { return $null }
   # 2>$null: "item not found" is an ordinary answer here, not a failure.
   $v = & security find-generic-password -a $env:USER -s $script:KEYCHAIN_SERVICE -w 2>$null
@@ -168,6 +176,24 @@ function Get-CanvasTokenInstructions($hintBase) {
      It takes the token from your clipboard, stores it for your Windows
      account, and wipes the clipboard. Nothing is printed, and unlike setx the
      token never appears on a command line where auditing would record it.
+"@
+  }
+  if ((Get-CanvasPlatform) -eq 'linux') {
+    return @"
+  1. Open  $hintBase/profile/settings  and click  + New Access Token
+  2. Copy it. Then in a terminal, if you have libsecret (most desktop distros):
+
+       secret-tool store --label='Canvas' service $($script:KEYCHAIN_SERVICE)
+
+     It prompts for the token and reads it silently. Paste it, press Return.
+
+     No secret-tool? Linux has no single built-in store, so the honest fallback
+     is your shell profile - but understand the trade: this DOES put an
+     unscoped, full-account token in a plaintext file.
+
+       printf 'export CANVAS_TOKEN=%s\n' '<paste>' >> ~/.bashrc && chmod 600 ~/.bashrc
+
+     Prefer installing libsecret (apt install libsecret-tools) over that.
 "@
   }
   return @"
@@ -356,6 +382,16 @@ function Register-CanvasSchedule {
   $exe  = Get-CanvasShellExe
   $sargs = @(Get-CanvasShellArgs $ScriptPath) + $ExtraArgs
 
+  # This function promises never to throw, and the caller relies on that: by the
+  # time it runs, the workspace, every class folder and the whole Canvas mirror
+  # already exist. An escaping error - Access Denied on a managed school laptop,
+  # Task Scheduler disabled, a same-named task owned by another account, or an
+  # unwritable ~/Library/LaunchAgents - would abort setup before the standup is
+  # written and before the closing "here is what you got" is printed, so a
+  # student whose install succeeded in every way that matters sees only red text.
+  # One try/catch around the whole body keeps that promise on both platforms.
+  try {
+
   if ($plat -eq 'windows') {
     if (-not (Get-Command Register-ScheduledTask -EA SilentlyContinue)) {
       return @{ Ok = $false; Name = $Name; Detail = 'the ScheduledTasks module is unavailable' }
@@ -411,6 +447,12 @@ function Register-CanvasSchedule {
     return @{ Ok = $true; Name = $label; Detail = "Loaded launchd agent '$label'. Check: launchctl list | grep $label"; Plist = $xml; Path = $plistPath }
   }
   return @{ Ok = $false; Name = $label; Detail = "wrote $plistPath but launchctl did not load it - run: launchctl bootstrap gui/$uid `"$plistPath`""; Plist = $xml; Path = $plistPath }
+
+  } catch {
+    # Report, never throw. The caller turns this into a warning and carries on,
+    # so an unschedulable machine still finishes with a complete workspace.
+    return @{ Ok = $false; Name = $Name; Detail = "could not register the recurring job: $($_.Exception.Message)" }
+  }
 }
 
 function Get-CanvasScheduleState {

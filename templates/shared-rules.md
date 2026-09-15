@@ -105,4 +105,4 @@ individual accounts and redirects to its Antigravity suite. Use its CLI instead:
 Pipe the prompt on stdin rather than `-p "..."`, on either platform: `agy -p`
 starts with an empty context so it would not see these rules anyway, and on
 Windows PowerShell 5.1 the quotes get mangled too. The pipe form above works on
-Windows and macOS alike. See `docs/gemini-vs-antigravity.md`.
+Windows and macOS alike. See `../docs/gemini-vs-antigravity.md` - this block is copied into each class folder, one level below the workspace root.

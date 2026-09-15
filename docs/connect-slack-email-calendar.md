@@ -91,13 +91,20 @@ instead - keep that token in an environment variable, never in a file.
 
 ```powershell
 agy mcp add --type http <name> <url-from-the-vendor>
-agy mcp add -H "Authorization: Bearer $env:SOME_TOKEN" <name> <url>
 agy mcp list
 agy mcp disable <name>      # keep the config, stop using it
 agy mcp remove <name>
 ```
 
 Flags must come before the name; a flag after it is rejected.
+
+**Prefer OAuth over a header token.** An `-H "Authorization: Bearer ..."` flag
+puts the secret on a child process's command line, where `ps` on macOS and
+Windows process auditing both record it - the same exposure this tool avoids for
+the Canvas token by never using `setx`. Almost every connector here supports a
+browser sign-in instead; use it. If a server genuinely offers no OAuth and you
+must pass a header, understand that you are accepting that exposure, and use a
+token scoped to the narrowest thing that works rather than a full-account one.
 
 ---
 

@@ -55,8 +55,12 @@ Then, **on Windows**, double-click `setup.cmd` in the folder - or from a
 terminal:
 
 ```powershell
-setup.cmd
+.\setup.cmd
 ```
+
+The `.\` matters in PowerShell - without it you get "not recognized as the name
+of a cmdlet", because PowerShell deliberately does not run programs from the
+current folder.
 
 **On macOS**, in Terminal:
 

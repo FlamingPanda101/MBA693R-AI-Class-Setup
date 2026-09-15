@@ -17,7 +17,18 @@ $Root = $PSScriptRoot
 $cfgPath = Join-Path $Root 'courses.json'
 if (-not (Test-Path $cfgPath)) { Write-Error "No courses.json here. Run setup.ps1 first." }
 
-if ($Refresh) { & (Join-Path $Root 'canvas-watch.ps1') | Out-Null }
+if ($Refresh) {
+  # Prefer whichever watcher this workspace actually schedules. A workspace that
+  # grew its own multi-class canvas-watch-all.ps1 must not be refreshed by a
+  # different script than the hourly job uses, or the two disagree about layout
+  # and the standup reads one while the other writes the other.
+  $watcher = @('canvas-watch-all.ps1', 'canvas-watch.ps1') |
+             ForEach-Object { Join-Path $Root $_ } |
+             Where-Object { Test-Path $_ } |
+             Select-Object -First 1
+  if (-not $watcher) { Write-Error "-Refresh needs canvas-watch.ps1 (or canvas-watch-all.ps1) next to this script, and neither is here." }
+  & $watcher | Out-Null
+}
 
 # UTF-8 without a BOM: JSON.parse and json.load both reject a leading BOM, and a
 # BOM in an .ics file makes some calendar importers reject the whole file.
@@ -41,6 +52,7 @@ $cfg = Get-Content $cfgPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $now = Get-Date
 $items = @()
 $oldest = $null
+$missing = @()   # classes whose mirror is absent, so they appear nowhere below
 
 foreach ($c in @($cfg.courses)) {
   if ($c.enabled -eq $false) { continue }
@@ -50,7 +62,10 @@ foreach ($c in @($cfg.courses)) {
   $srcSub = Join-Path 'sources' 'canvas'
   $sub = if ($c.folder -and (Test-Path (Join-Path $Root (Join-Path $c.folder (Join-Path $srcSub 'assignments.json'))))) { $srcSub } else { 'canvas' }
   $f = Join-Path $Root (Join-Path $c.folder (Join-Path $sub 'assignments.json'))
-  if (-not (Test-Path $f)) { continue }
+  # Missing mirror means this whole class is invisible below. Silently skipping
+  # it let a student read a confident standup with an entire course absent while
+  # the freshness line still said "0 h old". Count it and say so.
+  if (-not (Test-Path $f)) { $missing += $c.short; continue }
   $stamp = (Get-Item $f).LastWriteTime
   if (-not $oldest -or $stamp -lt $oldest) { $oldest = $stamp }
   # A course with no assignments leaves an empty file, and ConvertFrom-Json
@@ -81,7 +96,11 @@ $seen = @{}
 if (Test-Path $seenPath) {
   $rawSeen = Get-Content $seenPath -Raw -Encoding UTF8 -EA SilentlyContinue
   if (-not [string]::IsNullOrWhiteSpace($rawSeen)) {
-    try { (ConvertFrom-Json $rawSeen).PSObject.Properties | ForEach-Object { $seen[$_.Name] = $_.Value } } catch { }
+    # Say so when it is unreadable. Swallowing this silently makes a corrupt
+    # file look like a first run, so that cycle's NEW and MOVED items - the only
+    # reason this feature exists - are dropped and never mentioned again.
+    try { (ConvertFrom-Json $rawSeen).PSObject.Properties | ForEach-Object { $seen[$_.Name] = $_.Value } }
+    catch { Write-Warning "$seenPath is unreadable, so changes since the last standup cannot be shown this once. It will be rebuilt now and work normally from the next run." }
   }
 }
 $firstRun = ($seen.Count -eq 0)
@@ -94,8 +113,13 @@ foreach ($x in $items) {
   if (-not $firstRun) {
     if (-not $seen.ContainsKey($k)) { $newItems += $x }
     elseif ($seen[$k] -ne $stamp) {
+      # Compare the DUE part only. The stamp also carries points, so an
+      # instructor re-weighting an assignment used to be reported as MOVED with
+      # an identical before and after date - which reads as a bug in the report.
       $wasDue = ($seen[$k] -split '\|')[0]
-      $movedItems += [pscustomobject]@{ Item = $x; Was = $wasDue }
+      if ($wasDue -ne $x.Due.ToString('yyyy-MM-ddTHH:mm')) {
+        $movedItems += [pscustomobject]@{ Item = $x; Was = $wasDue }
+      }
     }
   }
 }
@@ -116,6 +140,13 @@ if ($age -lt 0) {
   $md += "> **The Canvas mirror is $age h old** - the hourly watcher has missed about $age runs, so anything added or moved since then is not shown here. Run ``.\doctor.ps1`` to find out why, or ``.\standup.ps1 -Refresh`` to update now."
 } else {
   $md += "_Canvas mirror is $age h old. Confirm anything time-critical in Canvas itself._"
+}
+if ($missing.Count) {
+  # A class with no mirror contributes nothing below, and the freshness line
+  # above would still read "0 h old" - a confident report with a course silently
+  # absent. Name them.
+  $md += ""
+  $md += "> **$($missing.Count) class(es) are missing from this report** - $($missing -join ', ') - because their Canvas mirror has not been written yet. Nothing from them is counted below. Refresh the watcher, or run ``.\doctor.ps1`` if it keeps happening."
 }
 $md += ""
 $md += "**$($overdue.Count) past due - $($today.Count) due today - $($window.Count) in the next $Days days ($($graded.Count) worth points)**"
@@ -188,7 +219,12 @@ WriteUtf8 (Join-Path $Root 'STANDUP.md') ($md -join "`n")
 # RFC 5545. Escape TEXT values and fold lines at 75 octets, or strict importers
 # (Outlook especially) reject the file.
 function IcsText($t) {
-  (([string]$t) -replace '\\', '\\\\' -replace ';', '\;' -replace ',', '\,' -replace "`r`n", '\n' -replace "`n", '\n')
+  # .Replace for the backslash, NOT -replace. A -replace REPLACEMENT string is
+  # handed to .NET Regex.Replace, where a backslash is literal - so '\\\\' emits
+  # FOUR backslashes, not the two RFC 5545 asks for, and every path in a
+  # description rendered doubled. .Replace has no regex semantics either side.
+  # It must run first, or it would escape the backslashes the later rules add.
+  (([string]$t).Replace('\', '\\') -replace ';', '\;' -replace ',', '\,' -replace "`r`n", '\n' -replace "`n", '\n')
 }
 function IcsFold($line) {
   $bytes = [Text.Encoding]::UTF8.GetBytes($line)
@@ -214,8 +250,14 @@ foreach ($x in ($items | Sort-Object Due)) {
   # A zero-duration event (DTSTART == DTEND) renders as a bare dot in Google and
   # is easy to miss entirely. Give it a visible 30-minute block that ENDS at the
   # deadline, so the event still sits on the correct day and hour.
-  $utc   = $x.Due.ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
-  $start = $x.Due.AddMinutes(-30).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
+  # Subtract in UTC, never in local time. A local subtraction can land inside a
+  # DST spring-forward gap - an hour that does not exist - and converting that
+  # back yields a DTSTART AFTER its DTEND, which strict importers reject.
+  # Measured: a 03:15 deadline on 2027-03-14 Mountain gave DTSTART 09:45Z with
+  # DTEND 09:15Z. UTC has no gaps, so 30 minutes is always 30 minutes.
+  $dueUtc = $x.Due.ToUniversalTime()
+  $utc    = $dueUtc.ToString('yyyyMMddTHHmmssZ')
+  $start  = $dueUtc.AddMinutes(-30).ToString('yyyyMMddTHHmmssZ')
   $ics += 'BEGIN:VEVENT'
   $ics += "UID:canvas-$($x.CourseId)-$($x.Id)@mba-canvas-workspace"
   $ics += "DTSTAMP:$stampUtc"
@@ -237,6 +279,7 @@ if (-not $Quiet) {
   Write-Host ""
   Write-Host "STANDUP  $($now.ToString('ddd MMM dd, h:mm tt'))" -F Cyan
   Write-Host ("  {0} past due | {1} due today | {2} in {3} days ({4} graded)" -f $overdue.Count, $today.Count, $window.Count, $Days, $graded.Count)
+  if ($missing.Count) { Write-Warning "$($missing.Count) class(es) have no Canvas mirror yet and are NOT in this report: $($missing -join ', ')." }
   if ($age -gt $STALE_H) { Write-Warning "Canvas mirror is $age h old - the hourly watcher has missed about $age runs. Check it with doctor.ps1, or refresh now with -Refresh." }
   Write-Host ""
   if ($today.Count) {

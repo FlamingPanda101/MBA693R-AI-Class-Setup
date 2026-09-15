@@ -108,7 +108,19 @@ $now = Get-Date; $state = @{}; $all = @(); $seen = @()
 foreach ($c in (AsArray $cfg.courses)) {
   if ($c.enabled -eq $false) { continue }
   $seen += [int]$c.id
-  $outDir = Join-Path (Join-Path $Root $c.folder) 'canvas'
+  # Refresh the mirror that is already there rather than assuming 'canvas'.
+  # standup.ps1 reads whichever of sources/canvas and canvas exists, so a
+  # hardcoded 'canvas' here would quietly build a SECOND mirror next to a
+  # sources/canvas one, leave the standup reading the old copy, and show stale
+  # deadlines with no error anywhere. Only fall back to 'canvas' for a course
+  # that has no mirror yet.
+  $classDir = Join-Path $Root $c.folder
+  $srcSub   = Join-Path 'sources' 'canvas'
+  $outDir   = if (Test-Path (Join-Path $classDir (Join-Path $srcSub 'assignments.json'))) {
+                Join-Path $classDir $srcSub
+              } else {
+                Join-Path $classDir 'canvas'
+              }
   try {
     $info = Get-Canvas "courses/$($c.id)`?include[]=syllabus_body"
     $asgs = Get-CanvasAll "courses/$($c.id)/assignments?per_page=100&include[]=submission"
@@ -204,7 +216,14 @@ Save ($md -join "`n") $DuePath
 # ---------- change log ----------
 $stamp = $now.ToString('yyyy-MM-dd HH:mm')
 if (-not (Test-Path $Snap)) {
-  Save "# Canvas change log`n`n- $stamp - baseline captured ($($state.Count) assignments)." $Log
+  # APPEND. A missing snapshot does not mean a missing history: cloud sync
+  # hydrates a folder file by file, so .canvas-snapshot.json can be absent on a
+  # new machine while CHANGES.md is already there and full. Truncating here
+  # destroyed the entire change log, and nothing recovers it - CHANGES.md is
+  # gitignored, and at an hourly cadence Drive's version history rolls past its
+  # cap in days. Write the header only when the log genuinely does not exist.
+  if (-not (Test-Path $Log)) { Save "# Canvas change log`n" $Log }
+  Save "- $stamp - baseline captured ($($state.Count) assignments)." $Log -Append
   Write-Host "`n$stamp - baseline captured ($($state.Count) assignments)."
 } else {
   # A cloud-synced snapshot can read back empty while OneDrive / Drive is still

@@ -95,7 +95,7 @@ on the wire in cleartext.
 
 **6. "How often should it check Canvas?"**
 Default every hour. Explain the trade: more often catches a late deadline
-change sooner; less often is quieter. Anything from 1 to 12 is sensible. Pass
+change sooner; less often is quieter. Keep it at 1 unless they ask otherwise: doctor.ps1 and STANDUP.md flag a mirror older than 3 h, so a slower cadence makes a healthy setup report as stale every time. 1 to 3 is safe. Pass
 it as `-Every <hours>`.
 
 **7. "Want a standup waiting for you each morning?"**
@@ -133,12 +133,12 @@ Then use the launcher for that platform and stop thinking about shells:
 
 | Platform | From the repo folder |
 |---|---|
-| Windows | `setup.cmd` |
+| Windows | `.\setup.cmd` - the `.\` matters, PowerShell will not run a command from the current folder without it |
 | macOS, Linux | `./setup.sh` |
 
 Each finds the right PowerShell, supplies the flags that platform needs, and
 runs the interview. Arguments pass straight through, so
-`setup.cmd -Root "<path>" -Agents claude -Every 1` and the `./setup.sh`
+`.\setup.cmd -Root "<path>" -Agents claude -Every 1` and the `./setup.sh`
 equivalent both work - **use that form** once you have their answers, so they
 are never asked the same question twice.
 
@@ -146,8 +146,18 @@ are never asked the same question twice.
 command instead. Relay that, offer to wait, then continue.
 
 `platform.ps1` is the only file that knows the difference; everything else calls
-into it. For any other script, `. ./platform.ps1; Get-CanvasRunCommand '<full
-path>'` returns the exact command line for this machine. Write paths with `/`,
+into it.
+
+**Every `. ./platform.ps1; ...` snippet below is PowerShell, not a shell
+command.** Dot-sourcing only works inside PowerShell, so from your own shell you
+must wrap it. From the workspace or repo folder:
+
+    Windows:  powershell -NoProfile -ExecutionPolicy Bypass -Command ". ./platform.ps1; <the snippet>"
+    macOS:    pwsh -NoProfile -Command ". ./platform.ps1; <the snippet>"
+
+Pasting a bare `. ./platform.ps1; ...` into cmd.exe, bash or zsh fails. Once
+inside PowerShell, `. ./platform.ps1; Get-CanvasRunCommand '<full path>'`
+returns the exact command line for this machine. Write paths with `/`,
 which both platforms accept: a literal `\` is a legal filename character on
 macOS, not a separator, so a path built with one silently resolves to nothing
 instead of failing loudly.
@@ -363,7 +373,7 @@ are what actually run. Every rerun needs `-ExecutionPolicy Bypass`:
   `<pwsh> -File <workspace>/scaffold-class.ps1`
 - Token expiry warning: `"tokenExpires": "2026-12-13"` in `courses.json`
 - Health check: `. ./platform.ps1; Get-CanvasScheduleState` - reads Task Scheduler on Windows, launchd on macOS
-  (`LastTaskResult 0` is healthy)
+  (`Healthy = True` is healthy)
 
 ## What it makes
 
