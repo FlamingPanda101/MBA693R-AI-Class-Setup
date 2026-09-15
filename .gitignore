@@ -1,5 +1,7 @@
-# The workspace root doubles as the tool repo. Track only the tool; the class
-# folders, mirrors, and snapshots it generates are personal and stay local.
+# This repo holds the tool only. The workspace it builds lives elsewhere
+# (setup.ps1 -Root <path>) and is personal: class folders, Canvas mirrors,
+# snapshots and notes never belong in version control. The allowlist below is
+# belt-and-braces in case someone runs the tool in place anyway.
 *
 !.gitignore
 !README.md

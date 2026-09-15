@@ -22,6 +22,12 @@ foreach ($c in @($cfg.courses)) {
   $dir = Join-Path $Root $c.folder
   foreach ($sub in 'sources', 'work', 'submissions') { New-Item -ItemType Directory -Force -Path (Join-Path $dir $sub) | Out-Null }
 
+  # Codex refuses any folder that is not a git repo ("Not inside a trusted
+  # directory"), so without this it cannot open a single class folder.
+  if ((Get-Command git -EA SilentlyContinue) -and -not (Test-Path (Join-Path $dir '.git'))) {
+    git -C $dir init -q 2>&1 | Out-Null
+  }
+
   $courseBlock = @"
 ## This course
 | | |

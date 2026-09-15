@@ -12,6 +12,11 @@ $Log     = Join-Path $Root 'CHANGES.md'
 $DuePath = Join-Path $Root 'DUE.md'   # not $Due: PowerShell vars are case-insensitive
 $Horizon = 14                          # days shown in full detail in DUE.md
 
+# setx writes HKCU\Environment, invisible to an already-running process (the AI
+# agent driving this, or a scheduled task started before the value was set).
+# Read the User scope directly. The value is never displayed.
+if (-not $env:CANVAS_TOKEN) { $env:CANVAS_TOKEN = [Environment]::GetEnvironmentVariable('CANVAS_TOKEN', 'User') }
+if (-not $env:CANVAS_BASE)  { $env:CANVAS_BASE  = [Environment]::GetEnvironmentVariable('CANVAS_BASE',  'User') }
 if (-not $env:CANVAS_TOKEN) { Write-Error 'CANVAS_TOKEN is not set. Run setup.ps1 for the three-step fix.' }
 if (-not (Test-Path $MapPath)) { Write-Error 'courses.json not found. Run setup.ps1 first.' }
 $cfg  = Get-Content $MapPath -Raw -Encoding UTF8 | ConvertFrom-Json

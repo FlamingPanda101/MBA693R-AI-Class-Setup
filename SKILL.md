@@ -18,38 +18,54 @@ two things a script cannot do, run it, and explain the result.
 ## Steps
 
 1. **Where should the workspace live?** Ask. A sensible default is
-   `C:\Users\<name>\School`. If it will sit in OneDrive or Google Drive, one sync
-   client only - two on the same folder corrupt the git repos the tool creates.
+   `C:\Users\<name>\School`. It must be a *different* folder from this one - if
+   the tool folder were the workspace, this folder's `CLAUDE.md` / `AGENTS.md` /
+   `GEMINI.md` would sit above every class and each class session would load the
+   installer instructions instead of that class's rules. `setup.ps1` refuses it.
+   If the workspace sits in OneDrive or Google Drive, use one sync client only -
+   two on the same folder corrupt the per-class git repos.
 
 2. **Check the token, but do not touch it.** Run
-   `if ($env:CANVAS_TOKEN) { 'set' } else { 'missing' }`.
+   `if ([Environment]::GetEnvironmentVariable('CANVAS_TOKEN','User')) { 'set' } else { 'missing' }`.
+   Check the **User scope**, not `$env:CANVAS_TOKEN` - `setx` writes the registry,
+   and your own process cannot see it until you restart, so `$env:` will say
+   "missing" long after they have set it correctly.
    If missing, have THEM do this, in their own terminal:
    - Open `https://<school>.instructure.com/profile/settings` -> **+ New Access Token**.
      Purpose `canvas-watcher`, expiry end of semester.
-   - Copy it, then run `setx CANVAS_TOKEN (Get-Clipboard)` - reads it straight
-     from the clipboard so it never appears on screen or in shell history.
-   - Open a NEW terminal. `setx` does not affect the current one.
-   Wait until they confirm all three.
+   - Copy it, then run, exactly:
+     `setx CANVAS_TOKEN (Get-Clipboard); Set-Clipboard -Value 'cleared'`
+     The first half reads it straight from the clipboard so it never appears on
+     screen or in shell history; the second wipes the clipboard so a stray
+     Ctrl+V cannot paste their token into a chat window.
+   - If they use Win+V clipboard history: Settings > System > Clipboard > Clear.
+   Wait until they confirm.
 
-3. **Not BYU?** `setx CANVAS_BASE https://<school>.instructure.com`, then a new terminal.
+3. **Not BYU?** `setx CANVAS_BASE https://<school>.instructure.com`.
 
-4. **Run setup** from the directory containing this file:
+4. **Run setup** from the directory containing this file. The scripts read the
+   User scope themselves, so no terminal or agent restart is needed:
 
        powershell -ExecutionPolicy Bypass -File ".\setup.ps1" -Root "<workspace path>"
 
    It greets them by name (proves the token works), writes `courses.json`,
-   makes the folders, takes the first snapshot, and schedules the watcher every
-   4 hours. `-NoSchedule` skips the schedule; `-Every 6` changes the interval.
+   makes the folders, `git init`s each one (Codex needs that), takes the first
+   snapshot, and schedules the watcher every 4 hours. `-NoSchedule` skips the
+   schedule; `-Every 6` changes the interval.
 
 5. **Show them `DUE.md`.** Read out the "Next 14 days" table. Point out that
    rows tagged `(paper)` are handed in physically and will never show as
    submitted, and that 0-point rows are usually readings or attendance markers.
 
-6. **Tell them how to steer it:**
-   - Skip a course: set `"enabled": false` in `courses.json`, rerun `setup.ps1`.
-   - New semester: rerun `setup.ps1`; new courses merge in, nothing is lost.
-   - Change a shared rule: edit `templates\shared-rules.md`, rerun `scaffold-class.ps1`.
-   - Token expiry nag: put the date in `courses.json` as `"tokenExpires": "2026-12-13"`.
+6. **Tell them how to steer it.** Every path below is in the **workspace**, not
+   in this tool folder - the workspace copies are the ones that run. And every
+   rerun needs `-ExecutionPolicy Bypass`, or Windows' default policy blocks it:
+   - Skip a course: `"enabled": false` in `<workspace>\courses.json`, then
+     `powershell -ExecutionPolicy Bypass -File <workspace>\setup.ps1 -Root <workspace>`
+   - New semester: same command; new courses merge in, edits are kept.
+   - Change a shared rule: edit `<workspace>\templates\shared-rules.md`, then
+     `powershell -ExecutionPolicy Bypass -File <workspace>\scaffold-class.ps1`
+   - Token expiry nag: `"tokenExpires": "2026-12-13"` in `courses.json`.
    - Health check: `Get-ScheduledTaskInfo -TaskName 'Canvas Watch - <folder>'`
      (`LastTaskResult 0` is healthy).
 
