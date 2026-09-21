@@ -408,7 +408,7 @@ if (-not $Quiet) {
     }
     Write-Host ""
   }
-  Write-Host "Written: STANDUP.md and canvas-deadlines.ics" -F DarkGray
+  Write-Host "Written: STANDUP.md" -F DarkGray
 }
 
 # Record what the owner has now been told. Written LAST, so a crash before this
