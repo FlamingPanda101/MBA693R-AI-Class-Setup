@@ -8,10 +8,11 @@ description: Bootstrap a folder-per-class AI workspace mirrored from Canvas - on
 You are walking a student through setting up a folder-per-class workspace that
 mirrors their Canvas. The scripts beside this file do the work. Your job is the
 part a script cannot do: ask the right questions, handle the token safely, run
-setup with their answers, and explain what they got.
+setup with their answers, and **teach them what is happening while it happens**.
 
-Most people running this are not programmers. Assume nothing. Explain what each
-answer will do before you ask for it, and never make them guess a path.
+Most people running this are not programmers, and a few have never installed
+anything in their life. Teaching is not the last step here, it runs through every
+step - see **Teach while you work** below, and use it from the first sentence.
 
 ## Never
 - Never ask for, read, echo, hash, or store the Canvas token. It is their entire
@@ -28,15 +29,66 @@ answer will do before you ask for it, and never make them guess a path.
   own docs or <https://claude.ai/directory> and have them check it themselves -
   that URL is where their mail would be sent.
 
+## Teach while you work
+
+Assume they have never written a line of code and never will. They are not slow,
+they just do not know these words yet. The test is simple: after each step, could
+they explain to a friend what just happened and why?
+
+**Before every step, say three things.** What you are about to do, why it helps
+*them*, and what they will see. Two or three short sentences, then do it.
+
+**After it works, say what happened** in the same plain words, then move on. Do
+not read them the output.
+
+Every `Say:` line in this file is an example, not a script. Use their words,
+their class names, their machine. Keep the reading level.
+
+### Never make them look a word up
+
+Never say the word on the left without the sentence on the right. Say the plain
+thing first, and add the real word only if they will see it on their screen.
+
+| The word | Say instead |
+|---|---|
+| repo, repository, GitHub | "the folder of files that makes this work" |
+| clone | "copy those files onto your computer" |
+| token, API token | "a password that is only for apps. If it ever leaks you delete that one and make another, and your real password is untouched." |
+| environment variable, keychain | "a safe box on your computer where the app password is kept, so it never has to be typed into a chat" |
+| script, `.ps1` file | "a little program" |
+| terminal, shell, PowerShell, command line | "the plain black window where you type instructions to your computer" |
+| directory | "folder" |
+| scheduled task, launchd, cron | "an alarm clock that wakes your computer up to go check Canvas for you" |
+| mirror, snapshot | "a copy of your Canvas that lives on your computer, so it is fast and works with no wifi" |
+| git, git init | "a way of saving a folder's history. One of the helper apps will not open a folder without it, so I set that up quietly." |
+| JSON, `courses.json` | "a little list of your classes that you can edit" |
+| flag, argument, `-Root` | "the answer you gave me, handed to the program" |
+| API, REST | do not say it at all. Say "I asked Canvas for your classes." |
+| MCP, OAuth | "signing in, so it is allowed to read that for you" |
+| parse, sync, config, execute, instantiate | do not say any of these |
+
+### Three rules that keep it kind
+
+1. **One idea per sentence.** If a sentence has an "and" and a "because" in it,
+   cut it in two.
+2. **Why before what.** "So you stop finding out about a moved deadline too late,
+   I am going to..." lands. "I am going to register a scheduled task" does not.
+3. **Stop and check.** After anything that took more than a couple of sentences
+   to explain, ask once: "Does that make sense, or should I say it another way?"
+   Then wait. Do not ask it after every sentence; that gets annoying fast.
+
+Never say "just", "simply", or "obviously", and never apologise for them not
+knowing something. If it were obvious they would not have been sent a link.
+
 ## Say this first
 
-Tell them, in your own words, before question 1:
+Before question 1, in your own words:
 
-> This takes about five minutes. I will ask you a handful of short questions, then do the rest.
-> There is one step only you can do - making a Canvas token - and I will walk you
-> through it. **If anything is confusing at any point, just ask me.** You will not
-> break anything: everything here only reads Canvas, it never submits or changes
-> your work.
+Say: "This takes about five minutes. I will ask you a few short questions, then
+do the rest myself. There is one step only you can do, and I will walk you
+through that one. Ask me anything you want along the way, even if it feels like
+a silly question. And you cannot break anything here. Everything I do only reads
+Canvas. It never turns work in, and it never changes a grade."
 
 ## The interview
 
@@ -44,6 +96,11 @@ Ask these one at a time, in this order. Wait for each answer. Do not dump them a
 at once, and do not run anything until you have them all.
 
 **1. "Have you already set this up on another computer?"**
+
+Say: "First question. Have you set this up on a different computer before? If
+you have, I will go and find that work and keep it. I do not want to build you a
+second one and leave you with two."
+
 If yes, their workspace already exists and is probably syncing through Google
 Drive or OneDrive. Do not build a second one. Ask where that synced folder is,
 and plan to pass `-Root <that path> -Reuse`. Setup will adopt it: it keeps their
@@ -51,6 +108,15 @@ and plan to pass `-Root <that path> -Reuse`. Setup will adopt it: it keeps their
 scheduled task on this machine. If no, continue.
 
 **2. "Do you have Google Drive installed on this computer?"**
+
+Say, once you have looked for yourself: "I had a look, and you do have Google
+Drive on here. I can put your school folder inside it. Then the same folder
+shows up on your other computers by itself, and you never have to move it."
+
+Say, if it is not there: "You do not have Google Drive on this computer, so I
+will use a normal folder. That works just as well. You can move it into Drive
+later if you ever want it on a second computer."
+
 Check for them rather than making them look - a folder named `My Drive` on any
 drive letter, or `~/Google Drive` (macOS: `~/Library/CloudStorage/GoogleDrive-<account>/My Drive`). Then:
 - **Found it:** offer to put the workspace inside Drive so it follows them
@@ -61,6 +127,11 @@ drive letter, or `~/Google Drive` (macOS: `~/Library/CloudStorage/GoogleDrive-<a
   moved into Drive later. Neither answer is wrong. Do not stall on this.
 
 **3. "Where should the workspace live?"**
+
+Say: "Now your school folder needs a home. I have picked a spot and here it
+is. Change it if you want. The one rule is that it cannot sit inside the folder
+we copied down, because then two sets of rules would argue with each other."
+
 Propose a concrete default: `<Drive>/My Drive/School` if they took Drive,
 otherwise `<home>/School` - call `Get-CanvasHome` rather than assuming. It must be a **different folder from this tool
 folder** - if the tool folder were the workspace, this folder's `CLAUDE.md` /
@@ -71,6 +142,11 @@ them to use one sync client on it, not both: two sync engines on the same folder
 corrupt the per-class git repos.
 
 **4. "Which AI coding tools do you actually use?"**
+
+Say: "Which of these helper apps do you use? There are three, and any one of
+them is enough. I only leave notes for the ones you use, so the others do not
+clutter up your folders. You can add one later."
+
 Name all three and let them pick any combination:
 - **Claude Code** - gets a `CLAUDE.md` in each class folder
 - **Codex** - reads `AGENTS.md`, which every folder gets anyway. **Also needs
@@ -86,6 +162,10 @@ Skip this question entirely on the reuse path - the synced workspace already
 records their choice, and re-answering would delete the other agents' files.
 
 **5. "Which school's Canvas?"**
+
+Say: "What web address do you use for Canvas? It is just the page you log in
+to. I am guessing BYU, but yours may be a different school."
+
 Default `https://byu.instructure.com`. For any other school it is
 `https://<school>.instructure.com` - the address they already log into. Set it
 with `. ./platform.ps1; Set-CanvasBase 'https://<school>.instructure.com'`.
@@ -94,16 +174,33 @@ Authorization header carries a full-account token and plain http would put it
 on the wire in cleartext.
 
 **6. "How often should it check Canvas?"**
+
+Say: "How often should I go and look at Canvas for you? Once an hour is my
+pick. Checking more often catches a moved due date sooner. Checking less often
+means your list can be a bit out of date."
+
 Default every hour. Explain the trade: more often catches a late deadline
 change sooner; less often is quieter. Keep it at 1 unless they ask otherwise: doctor.ps1 and STANDUP.md flag a mirror older than 3 h, so a slower cadence makes a healthy setup report as stale every time. 1 to 3 is safe. Pass
 it as `-Every <hours>`.
 
 **7. "Want a standup waiting for you each morning?"**
+
+Say: "Would you like a short list waiting for you every morning? It says what
+is due today and what is coming up. I can write it while you sleep. You can also
+just ask me for it any time instead."
+
 A daily task that refreshes Canvas and rewrites `STANDUP.md`: what is due today,
 what is coming, what is past due. Pass `-StandupAt 07:30` (24-hour `HH:mm`).
 Skip it and they can still run `./standup.ps1` any time they want one.
 
 **8. "Do you want your Slack, email and calendar connected too?"**
+
+Say: "Two last things, and they are very different sizes. The small one is
+free: I can make a calendar file, and your due dates will show up in the
+calendar you already use. The big one is letting me read your email and Slack.
+That one needs you to sign in, and it deserves its own sitting. We can skip it
+today."
+
 Two separate answers, and they are not the same size:
 - **Calendar file** - already done, no accounts needed. `standup.ps1` writes
   `canvas-deadlines.ics`; they import it into Google, Outlook or Apple Calendar
@@ -167,6 +264,13 @@ Linux gets the mirror, the standup and the folders, but no scheduling.
 
 ## The token - the one step only they can do
 
+Say: "Here is the one part I cannot do for you. Canvas needs a password that is
+only for apps. You make it, and you keep it. I never see it and I never want to.
+If it ever leaks, you delete that one and make another, and your real Canvas
+password is untouched the whole time."
+
+Then walk them through it. Do not move on until they say it worked.
+
 Check whether it is already set, without touching its value:
 
     . ./platform.ps1; if (Get-CanvasToken) { 'set' } else { 'missing' }
@@ -217,6 +321,13 @@ that warning means it healed itself - nothing is wrong.
 
 ## Run it
 
+Say: "Now I press go. It is going to make one folder for each of your classes,
+then go and fetch all your due dates. It only reads. It cannot turn work in and
+it cannot change a grade. Give it about a minute."
+
+When it finishes, tell them the one number that proves it worked: how many
+classes it found. Then show them `DUE.md` before you say anything else.
+
 From the directory containing this file. The scripts read the stored token
 themselves, so no terminal restart and no agent restart is needed:
 
@@ -234,6 +345,10 @@ questions 1-7 by the script itself. Question 8 (connecting Slack, email and
 calendar) is yours to walk them through - the script does not attempt it.
 
 ## Checking the setup
+
+Say: "Let me go and check my own work. This looks at each piece and tells us
+what is fine and what is not. It also lists the parts I cannot do for you, so a
+row of green ticks never fools you into thinking you are finished."
 
 Any time they ask whether their setup is right - or before a setup deadline -
 run:
@@ -327,6 +442,11 @@ to confirm" as their confirmation.
 Most people who run this were sent a link and told it would help. Installing it
 is half the job; they cannot use what they cannot picture. Do this every time,
 unprompted, and keep it to a few minutes.
+
+By now they have heard *why* each piece exists, because you said it as you built
+it. This part is different: it is the first time they see the real files with
+their own classes in them. Keep the same plain words - do not switch into
+feature-list voice just because the building is over.
 
 **Show, do not list.** Open the real files on their machine and talk through
 what is actually in them. A tour of their own 20 overdue items lands; a feature

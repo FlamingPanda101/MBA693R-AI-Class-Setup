@@ -22,7 +22,8 @@ what each answer does before you ask for it.
 
 That is the whole thing. **You do not type any commands.** It works out whether
 you are on Windows or a Mac by itself, downloads the files, asks you seven short
-questions, builds everything, and then walks you through what you got.
+questions, builds everything, explains each step in plain English as it
+happens, and then walks you through what you got.
 
 1. Have you already set this up on another computer?
 2. Do you have Google Drive on this machine, and should the workspace live there?
