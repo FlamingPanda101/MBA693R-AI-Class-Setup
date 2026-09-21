@@ -394,10 +394,8 @@ if (-not $NoSchedule -and $StandupAt) {
 
 $dueHint     = Join-Path $Root 'DUE.md'
 $standupHint = Join-Path $Root 'STANDUP.md'
-$icsHint     = Join-Path $Root 'canvas-deadlines.ics'
 Write-Host ""
 Write-Host "Done. Open $dueHint for everything, or $standupHint for today." -F Green
-Write-Host "Calendar file: $icsHint - import it into Google, Outlook or Apple Calendar." -F DarkGray
 Write-Host ""
 # Print the commands for THIS machine, already correct. A reader should never
 # have to work out which shell they are on or which flags their platform wants.
