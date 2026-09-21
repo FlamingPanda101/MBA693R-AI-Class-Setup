@@ -9,12 +9,16 @@ your machine and is never written to a file.
 
 ## Install
 
-You need **one** of Claude Code, Codex, or Antigravity. Open it and send it this,
-in your own words:
+You need **one** of Claude Code, Codex, or Antigravity. Open it and paste this in:
 
-> https://github.com/FlamingPanda101/MBA693R-AI-Class-Setup
->
-> Set this up for me and teach me how to use it.
+```text
+Set up my class workspace from https://github.com/FlamingPanda101/MBA693R-AI-Class-Setup
+
+Clone that repo into a temporary folder, read its SKILL.md, and follow it.
+Ask me the questions one at a time, build the workspace somewhere else on my
+machine, and then show me how to use it. I am not a programmer, so explain
+what each answer does before you ask for it.
+```
 
 That is the whole thing. **You do not type any commands.** It works out whether
 you are on Windows or a Mac by itself, downloads the files, asks you seven short
@@ -111,12 +115,16 @@ about five minutes — ask your assistant to add it.
 
 ## Using it afterwards
 
-You still do not type commands. Ask your assistant in plain language:
+You still do not type commands. Open the assistant **in your workspace folder**
+so it picks up the rules, and ask in plain language:
 
-> what's due this week?
-> run my standup
-> help me start the Fabritek case
-> add my new class
+```text
+What's due this week?
+Run my standup.
+What changed in Canvas since yesterday?
+Help me start the Fabritek case.
+Add my new class.
+```
 
 It refreshes Canvas every hour on its own, so the answer is current without you
 asking for a refresh.
