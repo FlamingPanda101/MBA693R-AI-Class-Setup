@@ -18,10 +18,11 @@ $shared = $tpl -replace '\{\{OWNER\}\}', [string]$cfg.owner
 # Only write shims for the agents the student actually uses. AGENTS.md is always
 # written: it holds the rules themselves, and Codex reads it natively.
 $agents = @($cfg.agents)
-if (-not $agents) { $agents = @('claude', 'codex', 'antigravity') }
+if (-not $agents) { $agents = @('claude', 'codex', 'gemini') }
 $shims = @{}
 if ($agents -contains 'claude')      { $shims['CLAUDE.md'] = $true }
-if ($agents -contains 'antigravity') { $shims['GEMINI.md'] = $true }
+# Gemini CLI and Antigravity read the same file, so either choice writes it.
+if (($agents -contains 'gemini') -or ($agents -contains 'antigravity')) { $shims['GEMINI.md'] = $true }
 
 # Why materialise instead of "@../shared-rules.md"? Claude Code refuses to read
 # a parent of the folder it was launched in, so a parent import silently loads

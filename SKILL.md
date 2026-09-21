@@ -1,6 +1,6 @@
 ---
 name: mba-canvas-workspace
-description: Bootstrap a folder-per-class AI workspace mirrored from Canvas - one folder per course with rules for Claude Code, Codex, and Antigravity, a scheduled read-only Canvas watcher, and a cross-class DUE.md of everything outstanding. Use when a student asks to track Canvas classes, set up class folders for AI agents, or see what is due across all courses.
+description: Bootstrap a folder-per-class AI workspace mirrored from Canvas - one folder per course with rules for Claude Code, Codex, and Gemini, a scheduled read-only Canvas watcher, and a cross-class DUE.md of everything outstanding. Use when a student asks to track Canvas classes, set up class folders for AI agents, or see what is due across all courses.
 ---
 
 # Canvas workspace
@@ -153,7 +153,14 @@ Name all three and let them pick any combination:
   Git installed**; without it Codex refuses every class folder with "Not inside
   a trusted directory". Check with `Get-Command git`, and if it is missing say
   so now rather than letting them discover it later.
-- **Antigravity** (Gemini) - gets a `GEMINI.md`
+- **Google Gemini** - gets a `GEMINI.md`. This is the one to name. Pass it as
+  `gemini`.
+
+Do not offer Antigravity. It is the fallback for one specific failure: Google
+blocks Gemini CLI sign-in on some personal Google accounts with
+`IneligibleTierError / UNSUPPORTED_CLIENT`. A school Google account usually
+avoids it. If they hit that error, or if they ask for Antigravity by name, pass
+`antigravity` instead - it writes the same `GEMINI.md`.
 Unused ones are clutter, so only write what they use. Pass the answer through as
 `-Agents claude,codex` (any subset). They can change it later by rerunning.
 If they are not sure, default to Claude Code and say it is easy to add more.
@@ -515,7 +522,7 @@ are what actually run. Every rerun needs `-ExecutionPolicy Bypass`:
 
 - Skip a course: `"enabled": false` in `<workspace>/courses.json`, then
   `<pwsh> -File <workspace>/setup.ps1 -Root <workspace>`
-- Add or drop an agent: same command plus `-Agents claude,antigravity`
+- Add or drop an agent: same command plus `-Agents claude,gemini`
 - New semester: same command; new courses merge in, edits are kept
 - Change a shared rule: edit `<workspace>/templates/shared-rules.md`, then
   `<pwsh> -File <workspace>/scaffold-class.ps1`

@@ -43,7 +43,9 @@ if ($StandupAt -and $StandupAt -notmatch '^([01]?\d|2[0-3]):[0-5]\d$') {
   Write-Error "-StandupAt must be a 24-hour time like 07:30 or 7:30 - got '$StandupAt'."
 }
 
-$VALID_AGENTS = @('claude', 'codex', 'antigravity')
+# 'antigravity' stays valid but is never offered: it is the fallback for when
+# Google blocks a Gemini sign-in, and existing workspaces recorded it.
+$VALID_AGENTS = @('claude', 'codex', 'gemini', 'antigravity')
 $agentList = @()
 if ($Agents) {
   $agentList = @($Agents -split '[,;\s]+' | Where-Object { $_ } | ForEach-Object { $_.Trim().ToLower() })
@@ -167,7 +169,7 @@ if ($Interview) {
     $sel = @()
     if (AskYesNo "   Claude Code?"           $true)  { $sel += 'claude' }
     if (AskYesNo "   Codex?"                 $false) { $sel += 'codex' }
-    if (AskYesNo "   Antigravity (Gemini)?"  $false) { $sel += 'antigravity' }
+    if (AskYesNo "   Google Gemini?"         $false) { $sel += 'gemini' }
     if (-not $sel) {
       Write-Host "   None selected - defaulting to Claude Code so the folders are usable." -F Yellow
       $sel = @('claude')
@@ -313,7 +315,7 @@ $cfg.base    = $Base
 # Agent choice: this run's -Agents wins; else what the workspace already recorded;
 # else all three, so a plain non-interactive install stays fully capable.
 if ($agentList)                 { $cfg.agents = @($agentList) }
-elseif (-not @($cfg.agents))    { $cfg.agents = @('claude', 'codex', 'antigravity') }
+elseif (-not @($cfg.agents))    { $cfg.agents = @('claude', 'codex', 'gemini') }
 else                            { $cfg.agents = @($cfg.agents) }
 
 $known = @{}; foreach ($c in $cfg.courses) { $known[[string]$c.id] = $true }

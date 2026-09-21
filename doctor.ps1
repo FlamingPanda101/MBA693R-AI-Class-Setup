@@ -62,7 +62,7 @@ if ($agy) {
   Say 'OK' "Antigravity CLI installed" "version $(& $agy --version 2>&1 | Select-Object -First 1)"
   $agents += 'Antigravity'
 } else {
-  Say 'INFO' "Antigravity CLI not installed" "Google's replacement for Gemini CLI on individual accounts"
+  Say 'INFO' "Antigravity CLI not installed" "only needed if Google blocks Gemini CLI for your account"
 }
 if ($agents.Count -ge 2) { Say 'OK' "$($agents.Count) agents installed" ($agents -join ', ') }
 else { Say 'FAIL' "only $($agents.Count) agent(s) installed" "the course requires two working locally" }
@@ -78,7 +78,7 @@ if ($Fast) {
   if (HasCmd 'gemini') {
     $g = (& gemini -p "reply OK" 2>&1 | Out-String)
     if ($g -match 'IneligibleTierError|UNSUPPORTED_CLIENT|no longer supported') {
-      Say 'WARN' 'Gemini CLI installed but BLOCKED by Google' 'individual accounts are migrated to Antigravity - see docs\gemini-vs-antigravity.md'
+      Say 'WARN' 'Gemini CLI blocked by Google for this account' 'a school Google account usually works; otherwise install Antigravity as the fallback - see docs\gemini-vs-antigravity.md'
     } elseif ($g -match 'Error authenticating|not authenticated') {
       Say 'WARN' 'Gemini CLI not signed in' 'run: gemini'
     } else {

@@ -1,7 +1,7 @@
 # mba-canvas-workspace
 
 One folder per class, mirrored from Canvas, ready for Claude Code, Codex, or
-Antigravity to work in. A scheduled job refreshes every course and writes a
+Gemini to work in. A scheduled job refreshes every course and writes a
 single `DUE.md` of everything outstanding across all your classes.
 
 Read-only. It never submits, grades, or messages. Your Canvas token stays on
@@ -9,7 +9,7 @@ your machine and is never written to a file.
 
 ## Install
 
-You need **one** of Claude Code, Codex, or Antigravity. Open it and paste this in:
+You need **one** of Claude Code, Codex, or Gemini. Open it and paste this in:
 
 ```text
 Set up my class workspace from https://github.com/FlamingPanda101/MBA693R-AI-Class-Setup
@@ -188,7 +188,7 @@ mail and Slack are a separate, bigger decision, and that guide covers both.
    powershell -ExecutionPolicy Bypass -File .\setup.ps1 -Root C:\Users\you\School -Agents claude
    ```
 
-   `-Agents` takes any subset of `claude,codex,antigravity`; omit it to get all
+   `-Agents` takes any subset of `claude,codex,gemini`; omit it to get all
    three. Add `-Reuse` if this workspace already came from another computer -
    setup will adopt it instead of rebuilding.
 
@@ -226,7 +226,7 @@ repo - the workspace copies are the ones that actually run. Reruns need
 | Want to... | Do this |
 |---|---|
 | Skip a course | `"enabled": false` in `courses.json`, rerun setup |
-| Add or drop an AI tool | rerun setup with `-Agents claude,antigravity` |
+| Add or drop an AI tool | rerun setup with `-Agents claude,gemini` |
 | Move to a new computer | install Drive (or copy the folder), then rerun setup with `-Reuse` |
 | Rename a class folder | edit `folder` in `courses.json` before first run |
 | New semester | rerun setup - new courses merge in, your edits are kept |

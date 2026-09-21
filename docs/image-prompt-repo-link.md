@@ -29,7 +29,7 @@ invent UI. Confirm the repo URL is character-perfect before sending it to anyone
 > Column 2 - "Paste it into your AI": a chat window with a text bubble reading
 > "Set up my Canvas workspace using this repo:" followed by a shortened link.
 > Below the chat window, three small labelled app tiles side by side -
-> **Claude Code**, **Codex**, **Antigravity** - with a caption underneath:
+> **Claude Code**, **Codex**, **Gemini** - with a caption underneath:
 > "Any one of these. You do not need all three." and, in smaller text under the
 > Codex tile only, a footnote marker reading "Codex also needs Git installed".
 >

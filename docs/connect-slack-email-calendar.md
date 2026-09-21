@@ -87,7 +87,30 @@ Codex has first-class OAuth: `login` runs the browser flow and stores the
 grant. `--bearer-token-env-var` is there if a service issues a static token
 instead - keep that token in an environment variable, never in a file.
 
-### Antigravity
+### Gemini
+
+Verified against Gemini CLI 0.61.0 with `gemini mcp add --help`, not from memory.
+
+```powershell
+gemini mcp add --transport http <name> <url-from-the-vendor>
+gemini mcp list
+gemini mcp disable <name>     # keep the config, stop using it
+gemini mcp remove <name>
+```
+
+`--transport` defaults to `stdio`, which is for a server you run locally. A
+hosted Slack/Gmail/Calendar connector is a URL, so pass `http` (or `sse` if the
+vendor says so) or the server will never connect.
+
+`--scope` defaults to `project`, meaning the server is configured for the folder
+you are standing in. Add `--scope user` if you want it everywhere.
+
+**Never pass `--trust`.** It bypasses every tool-call confirmation for that
+server, which is the one protection standing between a message in your inbox and
+an action taken on your behalf. The whole point of section 4 below is that you
+read what a message says and then decide. `--trust` decides for you.
+
+### Antigravity - only if Gemini will not sign in
 
 ```powershell
 agy mcp add --type http <name> <url-from-the-vendor>
@@ -167,9 +190,16 @@ Two mechanics worth knowing, both confirmed in Claude Code's docs:
 - Rules containing **parentheses are silently skipped** with a startup warning.
   `mcp__gmail__send(to:*)` does nothing at all. Deny the whole tool instead.
 
-Codex and Antigravity have no equivalent rules file. There, the OAuth scope you
-chose is your only control, so pick read-only scopes and use
-`agy mcp disable <name>` / `codex mcp logout <name>` when you are not using it.
+Codex and Antigravity have no equivalent rules file: there the scope you picked
+at the OAuth screen is your only control. Gemini CLI has a policy engine
+(`gemini --policy`, and `--allowed-tools` is deprecated in its favour) which
+this guide has **not** tested, so treat scope selection as your real control
+there too until someone does. For all three: choose read-only scopes, and turn a
+server off when you are not using it -
+
+    codex mcp logout <name>
+    gemini mcp disable <name>
+    agy mcp disable <name>
 
 Two things worth knowing, both confirmed in Claude Code's docs:
 - `deny` and `ask` rules accept wildcards like `mcp__slack__*`. **`allow` rules
@@ -177,9 +207,10 @@ Two things worth knowing, both confirmed in Claude Code's docs:
 - Rules containing **parentheses are silently skipped** with a startup warning.
   So `mcp__gmail__send(to:*)` does nothing. Deny the whole tool instead.
 
-Codex and Antigravity do not document an equivalent per-tool rule file. There,
-scope selection at the OAuth screen is your real control, so choose read-only
-scopes and use `agy mcp disable` when you are not actively using a server.
+Codex and Antigravity do not document an equivalent per-tool rule file, and
+Gemini's policy engine is untested here. For those three, scope selection at the
+OAuth screen is your real control, so choose read-only scopes and disable a
+server when you are not actively using it.
 
 ---
 
